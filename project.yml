@@ -15,9 +15,9 @@ targets:
     sources: 
       - path: CraftLink
     entitlements:
-      path: CraftLink/CraftLink.entitlements
+      path: CraftLink.entitlements
     info:
-      path: CraftLink/Info.plist
+      path: Info.plist
       properties:
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleName: CraftLink
