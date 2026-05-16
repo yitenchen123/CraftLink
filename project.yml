@@ -46,8 +46,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
-        LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
-        OTHER_LDFLAGS: -all_load -leasytier_ios
+        # ★★★ 移除静态库链接，主 App 不需要 ★★★
+        # LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
+        # OTHER_LDFLAGS: -all_load -leasytier_ios
     dependencies:
       - target: PacketTunnel
   PacketTunnel:
@@ -72,6 +73,3 @@ targets:
       - sdk: Network.framework
       - sdk: Security.framework
       - sdk: SystemConfiguration.framework
-      - sdk: CoreFoundation.framework
-      - sdk: IOKit.framework
-      - sdk: libresolv.tbd
