@@ -1,0 +1,63 @@
+name: Build CraftLink IPA (unsigned)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Download libeasytier_ios.a from EasyTier-iOS release
+        run: |
+          mkdir -p RustLib
+          curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/EasyTier-iOS/releases/download/发布easytier-ios的静态库文件/libeasytier_ios.a"
+          ls -la RustLib/
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Set version from tag
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" CraftLink/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" CraftLink/Info.plist
+
+      - name: Build unsigned .app
+        run: |
+          xcodebuild build \
+            -project CraftLink.xcodeproj \
+            -scheme CraftLink \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath build/derivedData
+
+      - name: Package IPA
+        run: |
+          APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r CraftLink.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: CraftLink-unsigned.ipa
+          path: CraftLink.ipa
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: CraftLink.ipa
