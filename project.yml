@@ -71,4 +71,7 @@ targets:
       - sdk: NetworkExtension.framework
       - sdk: Network.framework
       - sdk: Security.framework
-      - sdk: SystemConfiguration.framework   # ★★★ 新增：解决链接错误 ★★★
+      - sdk: SystemConfiguration.framework
+      - sdk: CoreFoundation.framework
+      - sdk: IOKit.framework
+      - sdk: libresolv.tbd
