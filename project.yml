@@ -15,7 +15,7 @@ targets:
     sources:
       - path: .
         excludes:
-          - "NetworkExtension"
+          - "PacketTunnel"          # 排除扩展目录
           - "Core"
           - "RustLib"
           - ".github"
@@ -49,28 +49,24 @@ targets:
         LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
         OTHER_LDFLAGS: -all_load -leasytier_ios
     dependencies:
-      - target: NetworkExtension
-  NetworkExtension:
+      - target: PacketTunnel        # 改为新名称
+  PacketTunnel:                     # 新 target 名称
     type: app-extension
     platform: iOS
     sources:
-      - path: NetworkExtension
+      - path: PacketTunnel          # 注意：原 NetworkExtension 目录需要重命名为 PacketTunnel
       - path: Services/InviteCodeService.swift
       - path: Services/RustBridge.swift
     entitlements:
-      path: NetworkExtension/NetworkExtension.entitlements
+      path: PacketTunnel/PacketTunnel.entitlements   # 对应重命名
     info:
-      path: NetworkExtension/Info.plist
+      path: PacketTunnel/Info.plist                  # 对应重命名
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.network-extension
+        PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.packet-tunnel
         SKIP_INSTALL: YES
         LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
-        OTHER_LDFLAGS: -all_load -leasytier_ios
-        # ★★★ 关键：强制链接 NetworkExtension 框架 ★★★
         OTHER_LDFLAGS: -all_load -leasytier_ios -framework NetworkExtension
-        # 或者使用 FRAMEWORK_SEARCH_PATHS 和 LD_FLAGS
-        FRAMEWORK_SEARCH_PATHS: $(SDKROOT)/System/Library/Frameworks
     dependencies:
       - sdk: NetworkExtension.framework
       - sdk: Network.framework
