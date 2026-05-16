@@ -49,8 +49,8 @@ targets:
         LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
         OTHER_LDFLAGS: -all_load -leasytier_ios
     dependencies:
-      - target: PacketTunnel   # 改为新名称
-  PacketTunnel:                # 新 target 名称
+      - target: PacketTunnel
+  PacketTunnel:
     type: app-extension
     platform: iOS
     sources:
@@ -71,3 +71,4 @@ targets:
       - sdk: NetworkExtension.framework
       - sdk: Network.framework
       - sdk: Security.framework
+      - sdk: SystemConfiguration.framework   # ★★★ 新增：解决链接错误 ★★★
