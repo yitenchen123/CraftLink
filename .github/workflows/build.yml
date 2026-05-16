@@ -21,10 +21,12 @@ jobs:
           curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/EasyTier-iOS/releases/download/发布easytier-ios的静态库文件/libeasytier_ios.a"
           ls -la RustLib/
 
-      - name: Check static library undefined symbols
+      - name: Check static library architecture and dependencies
         run: |
-          echo "Checking undefined symbols in static library..."
-          nm -m -u RustLib/libeasytier_ios.a 2>/dev/null | grep "undefined" | awk '{print $NF}' | sort -u | head -30 || echo "No undefined symbols found"
+          echo "Library info:"
+          file RustLib/libeasytier_ios.a
+          echo "\nUndefined symbols:"
+          nm -m -u RustLib/libeasytier_ios.a 2>/dev/null | grep "undefined" | awk '{print $NF}' | sort -u | head -30 || echo "None"
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -35,7 +37,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Info.plist
 
-      - name: Build unsigned .app (with detailed output)
+      - name: Build unsigned .app with detailed logging
         run: |
           xcodebuild build \
             -project CraftLink.xcodeproj \
@@ -47,11 +49,20 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             -derivedDataPath build/derivedData \
+            -showBuildTimingSummary \
             2>&1 | tee build.log
-          # 检查链接错误
+          
+          # 检查是否有链接错误
           if grep -q "error:.*linker command failed" build.log; then
             echo "❌ Linker error detected!"
-            grep -A10 "error:.*linker" build.log
+            grep -B5 -A10 "error:.*linker" build.log
+            exit 1
+          fi
+          
+          # 检查是否有 "Undefined symbols" 错误
+          if grep -q "Undefined symbols" build.log; then
+            echo "❌ Undefined symbols found!"
+            grep -B5 -A15 "Undefined symbols" build.log
             exit 1
           fi
 
@@ -62,7 +73,8 @@ jobs:
           ls -la "$APP_PATH"
           if [ ! -f "$APP_PATH/CraftLink" ]; then
             echo "❌ ERROR: Executable 'CraftLink' not found in app bundle!"
-            echo "Build may have failed silently."
+            echo "Checking build log for errors..."
+            grep -E "error:|warning:" build.log | head -50
             exit 1
           fi
           EXEC_NAME=$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$APP_PATH/Info.plist")
