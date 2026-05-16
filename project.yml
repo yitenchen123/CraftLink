@@ -1,0 +1,49 @@
+name: CraftLink
+options:
+  bundleIdPrefix: com.craftlink
+  deploymentTarget:
+    iOS: 15.0
+  xcodeVersion: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+    ENABLE_BITCODE: NO
+targets:
+  CraftLink:
+    type: application
+    platform: iOS
+    sources: 
+      - path: CraftLink
+    entitlements:
+      path: CraftLink/CraftLink.entitlements
+    info:
+      path: CraftLink/Info.plist
+      properties:
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleName: CraftLink
+        CFBundleDisplayName: 陶瓦联机
+        UILaunchStoryboardName: LaunchScreen
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
+        LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
+        OTHER_LDFLAGS: -all_load
+    dependencies:
+      - target: NetworkExtension
+  NetworkExtension:
+    type: app-extension
+    platform: iOS
+    sources: NetworkExtension
+    entitlements:
+      path: NetworkExtension/NetworkExtension.entitlements
+    info:
+      path: NetworkExtension/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.network-extension
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: Network.framework
+      - sdk: Security.framework
