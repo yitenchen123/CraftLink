@@ -48,6 +48,24 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -derivedDataPath build/derivedData
 
+      - name: Verify app bundle contains executable
+        run: |
+          APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
+          echo "App bundle path: $APP_PATH"
+          ls -la "$APP_PATH"
+          # 检查可执行文件是否存在
+          if [ ! -f "$APP_PATH/CraftLink" ]; then
+            echo "ERROR: Executable 'CraftLink' not found in app bundle!"
+            exit 1
+          fi
+          # 检查 Info.plist 中的 CFBundleExecutable 值
+          EXEC_NAME=$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$APP_PATH/Info.plist")
+          echo "CFBundleExecutable = $EXEC_NAME"
+          if [ "$EXEC_NAME" != "CraftLink" ]; then
+            echo "ERROR: CFBundleExecutable is '$EXEC_NAME', expected 'CraftLink'"
+            exit 1
+          fi
+
       - name: Package IPA
         run: |
           APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
