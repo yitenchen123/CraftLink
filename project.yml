@@ -9,7 +9,7 @@ settings:
     SWIFT_VERSION: 5.0
     ENABLE_BITCODE: NO
 targets:
-  CraftLink:
+  CraftLink: # 主App Target
     type: application
     platform: iOS
     sources:
@@ -47,14 +47,18 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
         LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
-        OTHER_LDFLAGS: -all_load
+        # 正确链接静态库，-leasytier_ios 对应 libeasytier_ios.a
+        OTHER_LDFLAGS: -all_load -leasytier_ios
     dependencies:
       - target: NetworkExtension
-  NetworkExtension:
+  NetworkExtension: # VPN扩展 Target
     type: app-extension
     platform: iOS
     sources:
       - path: NetworkExtension
+      # ★★★ 关键修复：显式添加缺失的源文件 ★★★
+      - path: Services/InviteCodeService.swift
+      - path: Services/RustBridge.swift
     entitlements:
       path: NetworkExtension/NetworkExtension.entitlements
     info:
