@@ -21,6 +21,11 @@ jobs:
           curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/EasyTier-iOS/releases/download/发布easytier-ios的静态库文件/libeasytier_ios.a"
           ls -la RustLib/
 
+      - name: Verify static library
+        run: |
+          file RustLib/libeasytier_ios.a
+          lipo -info RustLib/libeasytier_ios.a || echo "lipo not available"
+
       - name: Generate Xcode project
         run: xcodegen generate
 
