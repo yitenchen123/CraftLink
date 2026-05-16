@@ -12,8 +12,29 @@ targets:
   CraftLink:
     type: application
     platform: iOS
-    sources: 
-      - path: CraftLink/CraftLink
+    sources:
+      - path: .
+        excludes:
+          - "NetworkExtension"
+          - "Core"
+          - "RustLib"
+          - ".github"
+          - "CraftLink.xcodeproj"
+          - "*.md"
+          - "*.yml"
+          - ".*"
+          - "project.yml"
+          - "LICENSE"
+          - "README.md"
+        includes:
+          - "App/**/*.swift"
+          - "Views/**/*.swift"
+          - "Services/**/*.swift"
+          - "Models/**/*.swift"
+          - "Utils/**/*.swift"
+          - "ViewModels/**/*.swift"
+          - "Info.plist"
+          - "CraftLink.entitlements"
     entitlements:
       path: CraftLink.entitlements
     info:
@@ -22,9 +43,6 @@ targets:
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleName: CraftLink
         CFBundleDisplayName: 陶瓦联机
-        UILaunchStoryboardName: LaunchScreen
-        UIApplicationSceneManifest:
-          UIApplicationSupportsMultipleScenes: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
@@ -35,7 +53,8 @@ targets:
   NetworkExtension:
     type: app-extension
     platform: iOS
-    sources: NetworkExtension
+    sources:
+      - path: NetworkExtension
     entitlements:
       path: NetworkExtension/NetworkExtension.entitlements
     info:
