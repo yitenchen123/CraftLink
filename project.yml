@@ -13,23 +13,14 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: .
-        excludes:
-          - "PacketTunnel"
-          - "Core"
-          - "RustLib"
-          - ".github"
-          - "CraftLink.xcodeproj"
-          - "*.md"
-          - "*.yml"
-          - ".*"
-          - "project.yml"
-          - "LICENSE"
-          - "README.md"
-          - "build"
-          - "DerivedData"
-          - "Info.plist"
-          - "CraftLink.entitlements"
+      - path: App
+      - path: Views
+      - path: Services
+      - path: Models
+      - path: Utils
+      - path: ViewModels
+      - path: Info.plist
+      - path: CraftLink.entitlements
     entitlements:
       path: CraftLink.entitlements
     info:
@@ -38,7 +29,7 @@ targets:
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleName: CraftLink
         CFBundleDisplayName: 陶瓦联机
-        CFBundleExecutable: CraftLink
+        CFBundleExecutable: $(EXECUTABLE_NAME)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
