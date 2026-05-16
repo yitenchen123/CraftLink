@@ -21,10 +21,10 @@ jobs:
           curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/EasyTier-iOS/releases/download/发布easytier-ios的静态库文件/libeasytier_ios.a"
           ls -la RustLib/
 
-      - name: Verify static library
+      - name: Check static library undefined symbols
         run: |
-          file RustLib/libeasytier_ios.a
-          lipo -info RustLib/libeasytier_ios.a || echo "lipo not available"
+          echo "Checking undefined symbols in static library..."
+          nm -m -u RustLib/libeasytier_ios.a 2>/dev/null | grep "undefined" | awk '{print $NF}' | sort -u | head -30 || echo "No undefined symbols found"
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -35,7 +35,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Info.plist
 
-      - name: Build unsigned .app
+      - name: Build unsigned .app (with detailed output)
         run: |
           xcodebuild build \
             -project CraftLink.xcodeproj \
@@ -46,25 +46,32 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            -derivedDataPath build/derivedData
+            -derivedDataPath build/derivedData \
+            2>&1 | tee build.log
+          # 检查链接错误
+          if grep -q "error:.*linker command failed" build.log; then
+            echo "❌ Linker error detected!"
+            grep -A10 "error:.*linker" build.log
+            exit 1
+          fi
 
       - name: Verify app bundle contains executable
         run: |
           APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
           echo "App bundle path: $APP_PATH"
           ls -la "$APP_PATH"
-          # 检查可执行文件是否存在
           if [ ! -f "$APP_PATH/CraftLink" ]; then
-            echo "ERROR: Executable 'CraftLink' not found in app bundle!"
+            echo "❌ ERROR: Executable 'CraftLink' not found in app bundle!"
+            echo "Build may have failed silently."
             exit 1
           fi
-          # 检查 Info.plist 中的 CFBundleExecutable 值
           EXEC_NAME=$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$APP_PATH/Info.plist")
           echo "CFBundleExecutable = $EXEC_NAME"
           if [ "$EXEC_NAME" != "CraftLink" ]; then
-            echo "ERROR: CFBundleExecutable is '$EXEC_NAME', expected 'CraftLink'"
+            echo "❌ ERROR: CFBundleExecutable is '$EXEC_NAME', expected 'CraftLink'"
             exit 1
           fi
+          echo "✅ App bundle is valid."
 
       - name: Package IPA
         run: |
