@@ -12,6 +12,8 @@ class VPNManager: ObservableObject {
     static let shared = VPNManager()
     @Published var status: VPNStatus = .disconnected
     @Published var currentInviteCode: String?
+    @Published var currentPort: String?
+    @Published var lastError: String?   // 新增：错误信息
     
     private let vpnManager = NEVPNManager.shared()
     
@@ -42,36 +44,69 @@ class VPNManager: ObservableObject {
             case .disconnecting: self.status = .disconnecting
             @unknown default: self.status = .disconnected
             }
+            if self.status == .connected {
+                self.lastError = nil
+            }
         }
     }
     
-    func startWithInviteCode(_ inviteCode: String, completion: @escaping (Error?) -> Void) {
+    func startWithInviteCode(_ inviteCode: String, port: String? = nil, completion: @escaping (Error?) -> Void) {
         guard InviteCodeService.isValid(inviteCode) else {
-            completion(NSError(domain: "CraftLink", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效邀请码"]))
+            let error = NSError(domain: "CraftLink", code: -1, userInfo: [NSLocalizedDescriptionKey: "邀请码格式错误"])
+            DispatchQueue.main.async {
+                self.lastError = error.localizedDescription
+                completion(error)
+            }
             return
         }
-        currentInviteCode = inviteCode
         
+        currentInviteCode = inviteCode
+        currentPort = port
+        
+        // 保存到共享 UserDefaults
         let sharedDefaults = UserDefaults(suiteName: "group.com.craftlink")
         sharedDefaults?.set(inviteCode, forKey: "currentInviteCode")
+        sharedDefaults?.set(port, forKey: "currentPort")
         sharedDefaults?.synchronize()
         
         let config = NETunnelProviderProtocol()
-        config.providerBundleIdentifier = "com.craftlink.network-extension"
+        config.providerBundleIdentifier = "com.craftlink.packet-tunnel"
         config.serverAddress = "CraftLink VPN"
-        config.providerConfiguration = ["inviteCode": inviteCode]
+        config.providerConfiguration = [
+            "inviteCode": inviteCode,
+            "port": port ?? ""
+        ]
         
         vpnManager.loadFromPreferences { error in
-            if let error = error { completion(error); return }
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.lastError = error.localizedDescription
+                    completion(error)
+                }
+                return
+            }
             self.vpnManager.protocolConfiguration = config
             self.vpnManager.localizedDescription = "CraftLink"
             self.vpnManager.isEnabled = true
             self.vpnManager.saveToPreferences { error in
-                if let error = error { completion(error); return }
+                if let error = error {
+                    DispatchQueue.main.async {
+                        self.lastError = error.localizedDescription
+                        completion(error)
+                    }
+                    return
+                }
                 do {
                     try (self.vpnManager.connection as! NETunnelProviderSession).startTunnel(options: nil)
-                    completion(nil)
-                } catch { completion(error) }
+                    DispatchQueue.main.async {
+                        completion(nil)
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.lastError = error.localizedDescription
+                        completion(error)
+                    }
+                }
             }
         }
     }
@@ -79,5 +114,7 @@ class VPNManager: ObservableObject {
     func stopVPN() {
         vpnManager.connection.stopVPNTunnel()
         currentInviteCode = nil
+        currentPort = nil
+        lastError = nil
     }
 }
