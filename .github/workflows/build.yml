@@ -15,11 +15,20 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
-      - name: Download libeasytier_ios.a from EasyTier-iOS release
+      - name: Download libeasytier_ios.a
         run: |
           mkdir -p RustLib
           curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/EasyTier-iOS/releases/download/发布easytier-ios的静态库文件/libeasytier_ios.a"
           ls -la RustLib/
+
+      - name: Fix directory structure if nested
+        run: |
+          if [ -d "CraftLink/CraftLink" ]; then
+            echo "Found nested CraftLink directory, moving contents up..."
+            mv CraftLink/CraftLink/* CraftLink/
+            rmdir CraftLink/CraftLink
+          fi
+          ls -la CraftLink/
 
       - name: Generate Xcode project
         run: xcodegen generate
