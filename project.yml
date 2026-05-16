@@ -26,13 +26,8 @@ targets:
           - "project.yml"
           - "LICENSE"
           - "README.md"
-        includes:
-          - "App/**/*.swift"
-          - "Views/**/*.swift"
-          - "Services/**/*.swift"
-          - "Models/**/*.swift"
-          - "Utils/**/*.swift"
-          - "ViewModels/**/*.swift"
+          - "build"
+          - "DerivedData"
           - "Info.plist"
           - "CraftLink.entitlements"
     entitlements:
@@ -43,12 +38,10 @@ targets:
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleName: CraftLink
         CFBundleDisplayName: 陶瓦联机
+        CFBundleExecutable: CraftLink
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
-        # ★★★ 移除静态库链接，主 App 不需要 ★★★
-        # LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
-        # OTHER_LDFLAGS: -all_load -leasytier_ios
     dependencies:
       - target: PacketTunnel
   PacketTunnel:
