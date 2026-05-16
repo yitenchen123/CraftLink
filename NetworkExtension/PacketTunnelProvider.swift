@@ -22,7 +22,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let isServer = inviteCode.hasPrefix("U/")
         let networkName = InviteCodeService.networkName(from: inviteCode)
         
-        // 3. 生成配置
+        // 3. 生成 TOML 配置
         let tomlConfig = """
             instance_name = "craftlink"
             network_name = "\(networkName)"
@@ -56,7 +56,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 return
             }
             // 5. 获取 TUN fd 并传递给 Rust
-            if let fd = self.value(forKey: "packetFlow")?.value(forKey: "socketFileDescriptor") as? Int32 {
+            // 使用 packetFlow 获取 socketFileDescriptor（标准做法）
+            if let fd = self.packetFlow.value(forKey: "socketFileDescriptor") as? Int32 {
                 var fdErrMsg: UnsafePointer<CChar>? = nil
                 let fdRet = rust_set_tun_fd(fd, &fdErrMsg)
                 if fdRet != 0, let msg = fdErrMsg {
@@ -65,13 +66,17 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                     completionHandler(NSError(domain: "CraftLink", code: -3, userInfo: [NSLocalizedDescriptionKey: errorMsg]))
                     return
                 }
+            } else {
+                os_log("Failed to obtain socketFileDescriptor from packetFlow", log: self.log, type: .error)
+                // 不强制失败，因为某些情况下可能不需要
             }
             completionHandler(nil)
         }
     }
     
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {
-        rust_stop_network_instance()
+        let result = rust_stop_network_instance()
+        os_log("Rust network instance stopped with result: %d", log: log, type: .info, result)
         completionHandler()
     }
 }
