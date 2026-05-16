@@ -6,6 +6,7 @@ struct JoinRoomView: View {
     @State private var inputCode = ""
     @State private var isValid = false
     @State private var isConnecting = false
+    @State private var showError = false
     
     var body: some View {
         ZStack {
@@ -16,7 +17,7 @@ struct JoinRoomView: View {
                     .font(.system(size: 70))
                     .foregroundColor(Color(hex: "D34C3B"))
                 
-                Text("输入邀请码")
+                Text("加入房间")
                     .font(.title2)
                 
                 TextField("U/XXXX-XXXX-XXXX-XXXX", text: $inputCode)
@@ -58,15 +59,37 @@ struct JoinRoomView: View {
                             .foregroundColor(.green)
                             .font(.largeTitle)
                         Text("已加入房间")
-                        Text("现在打开 Minecraft，点击多人游戏 -> 局域网世界")
+                            .font(.headline)
+                        Text("房主虚拟 IP: 10.0.0.2")
+                            .font(.system(.body, design: .monospaced))
+                        Text("在 Minecraft 中连接 10.0.0.2:房主端口")
                             .font(.caption)
                             .multilineTextAlignment(.center)
                     }
+                    .padding()
+                } else if let error = vpnManager.lastError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                    }
+                    .padding()
                 }
                 
                 Spacer()
             }
             .padding()
+            .alert("连接失败", isPresented: $showError, actions: {
+                Button("确定", role: .cancel) { }
+            }, message: {
+                Text(vpnManager.lastError ?? "未知错误")
+            })
+        }
+        .onReceive(vpnManager.$lastError) { error in
+            if error != nil {
+                showError = true
+            }
         }
     }
     
@@ -74,8 +97,10 @@ struct JoinRoomView: View {
         isConnecting = true
         vpnManager.startWithInviteCode(inputCode) { error in
             isConnecting = false
-            if error == nil {
-                // 保存历史记录 (简单实现，可扩展)
+            if let error = error {
+                print("连接失败: \(error.localizedDescription)")
+            } else {
+                print("VPN connected")
             }
         }
     }
