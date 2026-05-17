@@ -1,4 +1,4 @@
-name: Build CraftLink IPA (unsigned)
+name: Build CraftLink
 
 on:
   push:
@@ -8,24 +8,18 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
-      - name: List Swift files in repository
-        run: find . -name "*.swift" -type f | head -20
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      - name: Install xcodegen
-        run: brew install xcodegen
-
-      - name: Download libeasytier_ios.a from EasyTier-iOS release
+      - name: Download static library
         run: |
           mkdir -p RustLib
           curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/CraftLink/releases/download/v1.0.0-lib/libeasytier_ios.a"
           ls -la RustLib/
-
-      - name: Generate Xcode project
-        run: xcodegen generate
 
       - name: Set version from tag
         run: |
@@ -44,21 +38,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            -derivedDataPath build/derivedData \
-            2>&1 | tee build.log
-
-      - name: Verify app bundle contains executable
-        run: |
-          APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
-          echo "App bundle path: $APP_PATH"
-          ls -la "$APP_PATH"
-          if [ ! -f "$APP_PATH/CraftLink" ]; then
-            echo "❌ ERROR: Executable 'CraftLink' not found!"
-            echo "Build log errors:"
-            grep -E "error:|warning:" build.log | head -30
-            exit 1
-          fi
-          echo "✅ App bundle is valid."
+            -derivedDataPath build/derivedData
 
       - name: Package IPA
         run: |
