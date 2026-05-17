@@ -1,4 +1,4 @@
-name: Build CraftLink IPA (unsigned)
+name: Build CraftLink IPA
 
 on:
   push:
