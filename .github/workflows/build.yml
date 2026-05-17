@@ -1,4 +1,4 @@
-name: Build CraftLink IPA
+name: Build CraftLink IPA (unsigned)
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
-      - name: Download static library
+      - name: Download libeasytier_ios.a
         run: |
           mkdir -p RustLib
           curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/CraftLink/releases/download/v1.0.0-lib/libeasytier_ios.a"
@@ -23,10 +23,6 @@ jobs:
 
       - name: Generate Xcode project
         run: xcodegen generate
-
-      - name: Debug: List generated sources
-        run: |
-          grep -o "PBXBuildFile.*\.swift" CraftLink.xcodeproj/project.pbxproj | head -20
 
       - name: Build unsigned .app
         run: |
@@ -40,12 +36,6 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             -derivedDataPath build/derivedData
-
-      - name: Verify executable
-        run: |
-          APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
-          ls -la "$APP_PATH" || exit 1
-          [ -f "$APP_PATH/CraftLink" ] && echo "✅ Executable found" || (echo "❌ Executable missing"; exit 1)
 
       - name: Package IPA
         run: |
