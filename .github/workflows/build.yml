@@ -12,10 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install xcodegen
-        run: brew install xcodegen
+      - name: Install xcodegen and ldid
+        run: |
+          brew install xcodegen
+          brew install ldid
 
-      - name: Download libeasytier_ios.a
+      - name: Download static library
         run: |
           mkdir -p RustLib
           curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/CraftLink/releases/download/v1.0.0-lib/libeasytier_ios.a"
@@ -36,6 +38,17 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             -derivedDataPath build/derivedData
+
+      - name: Embed entitlements into binaries
+        run: |
+          APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
+          # 确保 entitlements 文件已复制到 app 包内
+          cp CraftLink.entitlements "$APP_PATH/"
+          cp PacketTunnel/PacketTunnel.entitlements "$APP_PATH/PlugIns/PacketTunnel.appex/"
+          # 用 ldid 将权限写入二进制文件（越狱环境专用，但无害）
+          ldid -S"$APP_PATH/CraftLink.entitlements" "$APP_PATH/CraftLink"
+          ldid -S"$APP_PATH/PlugIns/PacketTunnel.appex/PacketTunnel.entitlements" "$APP_PATH/PlugIns/PacketTunnel.appex/PacketTunnel"
+          echo "✅ Entitlements embedded."
 
       - name: Package IPA
         run: |
