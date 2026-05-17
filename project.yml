@@ -5,7 +5,6 @@ options:
     iOS: 15.0
   xcodeVersion: "15.0"
   minimumXcodeGenVersion: 2.30.0
-  objectVersion: 56
 targets:
   CraftLink:
     type: application
@@ -49,10 +48,4 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app.packet-tunnel
         SKIP_INSTALL: YES
         LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
-        # 强制链接所有必需的系统框架
         OTHER_LDFLAGS: -all_load -leasytier_ios -framework NetworkExtension -framework SystemConfiguration -framework CoreFoundation -framework IOKit -framework Security -framework Network
-    dependencies:
-      - sdk: NetworkExtension.framework
-      - sdk: Network.framework
-      - sdk: Security.framework
-      - sdk: SystemConfiguration.framework
