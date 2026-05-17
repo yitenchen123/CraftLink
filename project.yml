@@ -1,0 +1,46 @@
+name: CraftLink
+options:
+  bundleIdPrefix: com.craftlink
+  deploymentTarget:
+    iOS: 15.0
+targets:
+  CraftLink:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Views
+      - path: Services
+      - path: Models
+      - path: Utils
+      - path: ViewModels
+      - path: Info.plist
+      - path: CraftLink.entitlements
+    entitlements:
+      path: CraftLink.entitlements
+    info:
+      path: Info.plist
+      properties:
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
+    dependencies:
+      - target: PacketTunnel
+  PacketTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: PacketTunnel
+      - path: Services/InviteCodeService.swift
+      - path: Services/RustBridge.swift
+    entitlements:
+      path: PacketTunnel/PacketTunnel.entitlements
+    info:
+      path: PacketTunnel/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app.packet-tunnel
+        LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
+        OTHER_LDFLAGS: -all_load -leasytier_ios -framework NetworkExtension
