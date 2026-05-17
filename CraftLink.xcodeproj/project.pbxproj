@@ -3,10 +3,23 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F101 /* AppDelegate.swift */; };
+		F002 /* CraftLinkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F102 /* CraftLinkApp.swift */; };
+		F003 /* RoomHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F103 /* RoomHistory.swift */; };
+		F004 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F104 /* PacketTunnelProvider.swift */; };
+		F005 /* InviteCodeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F105 /* InviteCodeService.swift */; };
+		F006 /* RustBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F106 /* RustBridge.swift */; };
+		F007 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F107 /* VPNManager.swift */; };
+		F008 /* BlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F108 /* BlurView.swift */; };
+		F009 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F109 /* ContentView.swift */; };
+		F00A /* CreateRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10A /* CreateRoomView.swift */; };
+		F00B /* LobbyViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10B /* LobbyViewController.swift */; };
+		F00C /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10C /* SettingsViewController.swift */; };
+		/* Frameworks */
 		01 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 02 /* NetworkExtension.framework */; };
 		03 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04 /* Network.framework */; };
 		05 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 06 /* Security.framework */; };
@@ -40,6 +53,18 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F101 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		F102 /* CraftLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CraftLinkApp.swift; sourceTree = "<group>"; };
+		F103 /* RoomHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomHistory.swift; sourceTree = "<group>"; };
+		F104 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
+		F105 /* InviteCodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteCodeService.swift; sourceTree = "<group>"; };
+		F106 /* RustBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RustBridge.swift; sourceTree = "<group>"; };
+		F107 /* VPNManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VPNManager.swift; sourceTree = "<group>"; };
+		F108 /* BlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurView.swift; sourceTree = "<group>"; };
+		F109 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F10A /* CreateRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRoomView.swift; sourceTree = "<group>"; };
+		F10B /* LobbyViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyViewController.swift; sourceTree = "<group>"; };
+		F10C /* SettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewController.swift; sourceTree = "<group>"; };
 		02 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		04 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
 		06 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
@@ -52,16 +77,6 @@
 		16 /* PacketTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PacketTunnel/PacketTunnel.entitlements; sourceTree = "<group>"; };
 		17 /* PacketTunnel-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		18 /* App */ = {isa = PBXFileSystemSynchronizedRootGroup; path = App; sourceTree = "<group>"; };
-		19 /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Views; sourceTree = "<group>"; };
-		1A /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Services; sourceTree = "<group>"; };
-		1B /* Models */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Models; sourceTree = "<group>"; };
-		1C /* Utils */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Utils; sourceTree = "<group>"; };
-		1D /* ViewModels */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ViewModels; sourceTree = "<group>"; };
-		1E /* PacketTunnel */ = {isa = PBXFileSystemSynchronizedRootGroup; path = PacketTunnel; sourceTree = "<group>"; };
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		1F /* Frameworks */ = {
@@ -98,17 +113,72 @@
 		22 /* CraftLink */ = {
 			isa = PBXGroup;
 			children = (
-				18 /* App */,
-				19 /* Views */,
-				1A /* Services */,
-				1B /* Models */,
-				1C /* Utils */,
-				1D /* ViewModels */,
-				1E /* PacketTunnel */,
+				30 /* App */,
+				31 /* Models */,
+				32 /* PacketTunnel */,
+				33 /* Services */,
+				34 /* Utils */,
+				35 /* Views */,
 				14 /* Info.plist */,
 				15 /* CraftLink.entitlements */,
 			);
 			path = "";
+			sourceTree = "<group>";
+		};
+		30 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F101 /* AppDelegate.swift */,
+				F102 /* CraftLinkApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		31 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F103 /* RoomHistory.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		32 /* PacketTunnel */ = {
+			isa = PBXGroup;
+			children = (
+				F104 /* PacketTunnelProvider.swift */,
+				16 /* PacketTunnel.entitlements */,
+				17 /* PacketTunnel-Info.plist */,
+			);
+			path = PacketTunnel;
+			sourceTree = "<group>";
+		};
+		33 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				F105 /* InviteCodeService.swift */,
+				F106 /* RustBridge.swift */,
+				F107 /* VPNManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		34 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				F108 /* BlurView.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		35 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				F109 /* ContentView.swift */,
+				F10A /* CreateRoomView.swift */,
+				F10B /* LobbyViewController.swift */,
+				F10C /* SettingsViewController.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		23 /* Products */ = {
@@ -225,7 +295,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				/* 删除了错误的 CraftLink.app 资源引用 */
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,7 +312,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				/* 文件系统同步组会自动添加源文件，此留空 */
+				F001 /* AppDelegate.swift in Sources */,
+				F002 /* CraftLinkApp.swift in Sources */,
+				F003 /* RoomHistory.swift in Sources */,
+				F005 /* InviteCodeService.swift in Sources */,
+				F006 /* RustBridge.swift in Sources */,
+				F007 /* VPNManager.swift in Sources */,
+				F008 /* BlurView.swift in Sources */,
+				F009 /* ContentView.swift in Sources */,
+				F00A /* CreateRoomView.swift in Sources */,
+				F00B /* LobbyViewController.swift in Sources */,
+				F00C /* SettingsViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,7 +330,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				/* 文件系统同步组会自动添加源文件，此留空 */
+				F004 /* PacketTunnelProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
