@@ -7,45 +7,46 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F101 /* AppDelegate.swift */; };
-		F002 /* CraftLinkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F102 /* CraftLinkApp.swift */; };
-		F003 /* RoomHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F103 /* RoomHistory.swift */; };
-		F004 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F104 /* PacketTunnelProvider.swift */; };
-		F005 /* InviteCodeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F105 /* InviteCodeService.swift */; };
-		F006 /* RustBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F106 /* RustBridge.swift */; };
-		F007 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F107 /* VPNManager.swift */; };
-		F008 /* BlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F108 /* BlurView.swift */; };
-		F009 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F109 /* ContentView.swift */; };
-		F00A /* CreateRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10A /* CreateRoomView.swift */; };
-		F00B /* LobbyViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10B /* LobbyViewController.swift */; };
-		F00C /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10C /* SettingsViewController.swift */; };
+		A100 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200 /* AppDelegate.swift */; };
+		A101 /* CraftLinkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A201 /* CraftLinkApp.swift */; };
+		A102 /* RoomHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A202 /* RoomHistory.swift */; };
+		A103 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A203 /* PacketTunnelProvider.swift */; };
+		A104 /* InviteCodeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A204 /* InviteCodeService.swift */; };
+		A105 /* RustBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A205 /* RustBridge.swift */; };
+		A106 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A206 /* VPNManager.swift */; };
+		A107 /* BlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A207 /* BlurView.swift */; };
+		A108 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A208 /* ContentView.swift */; };
+		A109 /* CreateRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A209 /* CreateRoomView.swift */; };
+		A10A /* LobbyViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20A /* LobbyViewController.swift */; };
+		A10B /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20B /* SettingsViewController.swift */; };
 		/* Frameworks */
-		01 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 02 /* NetworkExtension.framework */; };
-		03 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04 /* Network.framework */; };
-		05 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 06 /* Security.framework */; };
-		07 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08 /* SystemConfiguration.framework */; };
-		09 /* libeasytier_ios.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A /* libeasytier_ios.a */; };
-		0D /* PacketTunnel.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0E /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F001 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F100 /* NetworkExtension.framework */; };
+		F002 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F101 /* Network.framework */; };
+		F003 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F102 /* Security.framework */; };
+		F004 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F103 /* SystemConfiguration.framework */; };
+		F005 /* libeasytier_ios.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F104 /* libeasytier_ios.a */; };
+		/* Embed App Extension */
+		E001 /* PacketTunnel.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E100 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		0F /* PBXContainerItemProxy */ = {
+		P001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 10 /* Project object */;
+			containerPortal = R001 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 11 /* PacketTunnel */;
+			remoteGlobalIDString = T002 /* PacketTunnel */;
 			remoteInfo = PacketTunnel;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		12 /* Embed App Extensions */ = {
+		C001 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				0D /* PacketTunnel.appex in Embed App Extensions */,
+				E001 /* PacketTunnel.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -53,151 +54,154 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		F101 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		F102 /* CraftLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CraftLinkApp.swift; sourceTree = "<group>"; };
-		F103 /* RoomHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomHistory.swift; sourceTree = "<group>"; };
-		F104 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
-		F105 /* InviteCodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteCodeService.swift; sourceTree = "<group>"; };
-		F106 /* RustBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RustBridge.swift; sourceTree = "<group>"; };
-		F107 /* VPNManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VPNManager.swift; sourceTree = "<group>"; };
-		F108 /* BlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurView.swift; sourceTree = "<group>"; };
-		F109 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		F10A /* CreateRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateRoomView.swift; sourceTree = "<group>"; };
-		F10B /* LobbyViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyViewController.swift; sourceTree = "<group>"; };
-		F10C /* SettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewController.swift; sourceTree = "<group>"; };
-		02 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
-		04 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
-		06 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		08 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
-		0A /* libeasytier_ios.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libeasytier_ios.a; path = RustLib/libeasytier_ios.a; sourceTree = SOURCE_ROOT; };
-		0C /* CraftLink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CraftLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		0E /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		14 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		15 /* CraftLink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CraftLink.entitlements; sourceTree = "<group>"; };
-		16 /* PacketTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PacketTunnel/PacketTunnel.entitlements; sourceTree = "<group>"; };
-		17 /* PacketTunnel-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A200 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = App/AppDelegate.swift; sourceTree = "<group>"; };
+		A201 /* CraftLinkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CraftLinkApp.swift; path = App/CraftLinkApp.swift; sourceTree = "<group>"; };
+		A202 /* RoomHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RoomHistory.swift; path = Models/RoomHistory.swift; sourceTree = "<group>"; };
+		A203 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PacketTunnelProvider.swift; path = PacketTunnel/PacketTunnelProvider.swift; sourceTree = "<group>"; };
+		A204 /* InviteCodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InviteCodeService.swift; path = Services/InviteCodeService.swift; sourceTree = "<group>"; };
+		A205 /* RustBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RustBridge.swift; path = Services/RustBridge.swift; sourceTree = "<group>"; };
+		A206 /* VPNManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VPNManager.swift; path = Services/VPNManager.swift; sourceTree = "<group>"; };
+		A207 /* BlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BlurView.swift; path = Utils/BlurView.swift; sourceTree = "<group>"; };
+		A208 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContentView.swift; path = Views/ContentView.swift; sourceTree = "<group>"; };
+		A209 /* CreateRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CreateRoomView.swift; path = Views/CreateRoomView.swift; sourceTree = "<group>"; };
+		A20A /* LobbyViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LobbyViewController.swift; path = Views/LobbyViewController.swift; sourceTree = "<group>"; };
+		A20B /* SettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsViewController.swift; path = Views/SettingsViewController.swift; sourceTree = "<group>"; };
+		/* Info.plist and entitlements */
+		I100 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		I101 /* CraftLink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CraftLink.entitlements; sourceTree = "<group>"; };
+		I102 /* PacketTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = PacketTunnel.entitlements; path = PacketTunnel/PacketTunnel.entitlements; sourceTree = "<group>"; };
+		I103 /* PacketTunnel-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = PacketTunnel-Info.plist; path = PacketTunnel/Info.plist; sourceTree = "<group>"; };
+		/* Products */
+		E100 /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E101 /* CraftLink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CraftLink.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		/* Frameworks */
+		F100 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		F101 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
+		F102 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		F103 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
+		F104 /* libeasytier_ios.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libeasytier_ios.a; path = RustLib/libeasytier_ios.a; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		1F /* Frameworks */ = {
+		X001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01 /* NetworkExtension.framework in Frameworks */,
-				03 /* Network.framework in Frameworks */,
-				05 /* Security.framework in Frameworks */,
-				07 /* SystemConfiguration.framework in Frameworks */,
+				F001 /* NetworkExtension.framework in Frameworks */,
+				F002 /* Network.framework in Frameworks */,
+				F003 /* Security.framework in Frameworks */,
+				F004 /* SystemConfiguration.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		20 /* Frameworks */ = {
+		X002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				09 /* libeasytier_ios.a in Frameworks */,
+				F005 /* libeasytier_ios.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		21 = {
+		G001 = {
 			isa = PBXGroup;
 			children = (
-				22 /* CraftLink */,
-				23 /* Products */,
-				24 /* Frameworks */,
+				G002 /* CraftLink */,
+				G003 /* Products */,
+				G004 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
-		22 /* CraftLink */ = {
+		G002 /* CraftLink */ = {
 			isa = PBXGroup;
 			children = (
-				30 /* App */,
-				31 /* Models */,
-				32 /* PacketTunnel */,
-				33 /* Services */,
-				34 /* Utils */,
-				35 /* Views */,
-				14 /* Info.plist */,
-				15 /* CraftLink.entitlements */,
+				G005 /* App */,
+				G006 /* Models */,
+				G007 /* PacketTunnel */,
+				G008 /* Services */,
+				G009 /* Utils */,
+				G00A /* Views */,
+				I100 /* Info.plist */,
+				I101 /* CraftLink.entitlements */,
 			);
 			path = "";
 			sourceTree = "<group>";
 		};
-		30 /* App */ = {
+		G005 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				F101 /* AppDelegate.swift */,
-				F102 /* CraftLinkApp.swift */,
+				A200 /* AppDelegate.swift */,
+				A201 /* CraftLinkApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
 		};
-		31 /* Models */ = {
+		G006 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				F103 /* RoomHistory.swift */,
+				A202 /* RoomHistory.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
 		};
-		32 /* PacketTunnel */ = {
+		G007 /* PacketTunnel */ = {
 			isa = PBXGroup;
 			children = (
-				F104 /* PacketTunnelProvider.swift */,
-				16 /* PacketTunnel.entitlements */,
-				17 /* PacketTunnel-Info.plist */,
+				A203 /* PacketTunnelProvider.swift */,
+				I102 /* PacketTunnel.entitlements */,
+				I103 /* PacketTunnel-Info.plist */,
 			);
 			path = PacketTunnel;
 			sourceTree = "<group>";
 		};
-		33 /* Services */ = {
+		G008 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				F105 /* InviteCodeService.swift */,
-				F106 /* RustBridge.swift */,
-				F107 /* VPNManager.swift */,
+				A204 /* InviteCodeService.swift */,
+				A205 /* RustBridge.swift */,
+				A206 /* VPNManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
 		};
-		34 /* Utils */ = {
+		G009 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
-				F108 /* BlurView.swift */,
+				A207 /* BlurView.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
 		};
-		35 /* Views */ = {
+		G00A /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				F109 /* ContentView.swift */,
-				F10A /* CreateRoomView.swift */,
-				F10B /* LobbyViewController.swift */,
-				F10C /* SettingsViewController.swift */,
+				A208 /* ContentView.swift */,
+				A209 /* CreateRoomView.swift */,
+				A20A /* LobbyViewController.swift */,
+				A20B /* SettingsViewController.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
 		};
-		23 /* Products */ = {
+		G003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				0C /* CraftLink.app */,
-				0E /* PacketTunnel.appex */,
+				E101 /* CraftLink.app */,
+				E100 /* PacketTunnel.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		24 /* Frameworks */ = {
+		G004 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				02 /* NetworkExtension.framework */,
-				04 /* Network.framework */,
-				06 /* Security.framework */,
-				08 /* SystemConfiguration.framework */,
-				0A /* libeasytier_ios.a */,
+				F100 /* NetworkExtension.framework */,
+				F101 /* Network.framework */,
+				F102 /* Security.framework */,
+				F103 /* SystemConfiguration.framework */,
+				F104 /* libeasytier_ios.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -205,32 +209,32 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		25 /* CraftLink */ = {
+		T001 /* CraftLink */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 26 /* Build configuration list for PBXNativeTarget "CraftLink" */;
+			buildConfigurationList = L001 /* Build configuration list for PBXNativeTarget "CraftLink" */;
 			buildPhases = (
-				27 /* Sources */,
-				1F /* Frameworks */,
-				28 /* Resources */,
-				12 /* Embed App Extensions */,
+				Z001 /* Sources */,
+				X001 /* Frameworks */,
+				Z002 /* Resources */,
+				C001 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				29 /* PBXTargetDependency */,
+				D001 /* PBXTargetDependency */,
 			);
 			name = CraftLink;
 			productName = CraftLink;
-			productReference = 0C /* CraftLink.app */;
+			productReference = E101 /* CraftLink.app */;
 			productType = "com.apple.product-type.application";
 		};
-		11 /* PacketTunnel */ = {
+		T002 /* PacketTunnel */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2A /* Build configuration list for PBXNativeTarget "PacketTunnel" */;
+			buildConfigurationList = L002 /* Build configuration list for PBXNativeTarget "PacketTunnel" */;
 			buildPhases = (
-				2B /* Sources */,
-				20 /* Frameworks */,
-				2C /* Resources */,
+				Z003 /* Sources */,
+				X002 /* Frameworks */,
+				Z004 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -238,19 +242,19 @@
 			);
 			name = PacketTunnel;
 			productName = PacketTunnel;
-			productReference = 0E /* PacketTunnel.appex */;
+			productReference = E100 /* PacketTunnel.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		10 /* Project object */ = {
+		R001 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1500;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					25 = {
+					T001 = {
 						CreatedOnToolsVersion = 15.0;
 						SystemCapabilities = {
 							com.apple.ApplicationGroups.iOS = {
@@ -258,7 +262,7 @@
 							};
 						};
 					};
-					11 = {
+					T002 = {
 						CreatedOnToolsVersion = 15.0;
 						SystemCapabilities = {
 							com.apple.ApplicationGroups.iOS = {
@@ -271,7 +275,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 2D /* Build configuration list for PBXProject "CraftLink" */;
+			buildConfigurationList = L003 /* Build configuration list for PBXProject "CraftLink" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -279,26 +283,26 @@
 				en,
 				Base,
 			);
-			mainGroup = 21;
-			productRefGroup = 23 /* Products */;
+			mainGroup = G001;
+			productRefGroup = G003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				25 /* CraftLink */,
-				11 /* PacketTunnel */,
+				T001 /* CraftLink */,
+				T002 /* PacketTunnel */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		28 /* Resources */ = {
+		Z002 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		2C /* Resources */ = {
+		Z004 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -308,44 +312,44 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		27 /* Sources */ = {
+		Z001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F001 /* AppDelegate.swift in Sources */,
-				F002 /* CraftLinkApp.swift in Sources */,
-				F003 /* RoomHistory.swift in Sources */,
-				F005 /* InviteCodeService.swift in Sources */,
-				F006 /* RustBridge.swift in Sources */,
-				F007 /* VPNManager.swift in Sources */,
-				F008 /* BlurView.swift in Sources */,
-				F009 /* ContentView.swift in Sources */,
-				F00A /* CreateRoomView.swift in Sources */,
-				F00B /* LobbyViewController.swift in Sources */,
-				F00C /* SettingsViewController.swift in Sources */,
+				A100 /* AppDelegate.swift in Sources */,
+				A101 /* CraftLinkApp.swift in Sources */,
+				A102 /* RoomHistory.swift in Sources */,
+				A104 /* InviteCodeService.swift in Sources */,
+				A105 /* RustBridge.swift in Sources */,
+				A106 /* VPNManager.swift in Sources */,
+				A107 /* BlurView.swift in Sources */,
+				A108 /* ContentView.swift in Sources */,
+				A109 /* CreateRoomView.swift in Sources */,
+				A10A /* LobbyViewController.swift in Sources */,
+				A10B /* SettingsViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		2B /* Sources */ = {
+		Z003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F004 /* PacketTunnelProvider.swift in Sources */,
+				A103 /* PacketTunnelProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		29 /* PBXTargetDependency */ = {
+		D001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 11 /* PacketTunnel */;
-			targetProxy = 0F /* PBXContainerItemProxy */;
+			target = T002 /* PacketTunnel */;
+			targetProxy = P001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		2E /* Debug */ = {
+		B001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -410,7 +414,7 @@
 			};
 			name = Debug;
 		};
-		2F /* Release */ = {
+		B002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -467,7 +471,7 @@
 			};
 			name = Release;
 		};
-		30 /* Debug */ = {
+		B003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -489,7 +493,7 @@
 			};
 			name = Debug;
 		};
-		31 /* Release */ = {
+		B004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -511,7 +515,7 @@
 			};
 			name = Release;
 		};
-		32 /* Debug */ = {
+		B005 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
@@ -532,7 +536,7 @@
 			};
 			name = Debug;
 		};
-		33 /* Release */ = {
+		B006 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
@@ -558,29 +562,29 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		26 /* Build configuration list for PBXNativeTarget "CraftLink" */ = {
+		L001 /* Build configuration list for PBXNativeTarget "CraftLink" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				30 /* Debug */,
-				31 /* Release */,
+				B003 /* Debug */,
+				B004 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2A /* Build configuration list for PBXNativeTarget "PacketTunnel" */ = {
+		L002 /* Build configuration list for PBXNativeTarget "PacketTunnel" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				32 /* Debug */,
-				33 /* Release */,
+				B005 /* Debug */,
+				B006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2D /* Build configuration list for PBXProject "CraftLink" */ = {
+		L003 /* Build configuration list for PBXProject "CraftLink" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				2E /* Debug */,
-				2F /* Release */,
+				B001 /* Debug */,
+				B002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -588,5 +592,5 @@
 /* End XCConfigurationList section */
 
 	};
-	rootObject = 10 /* Project object */;
+	rootObject = R001 /* Project object */;
 }
