@@ -12,7 +12,6 @@
 		05 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 06 /* Security.framework */; };
 		07 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08 /* SystemConfiguration.framework */; };
 		09 /* libeasytier_ios.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A /* libeasytier_ios.a */; };
-		0B /* CraftLink.app in Resources */ = {isa = PBXBuildFile; fileRef = 0C /* CraftLink.app */; };
 		0D /* PacketTunnel.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0E /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -226,7 +225,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0B /* CraftLink.app in Resources */,
+				/* 删除了错误的 CraftLink.app 资源引用 */
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,7 +341,6 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
