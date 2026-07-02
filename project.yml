@@ -37,6 +37,7 @@ targets:
     platform: iOS
     sources:
       - path: PacketTunnel
+      - path: Services/Constants.swift
       - path: Services/InviteCodeService.swift
       - path: Services/RustBridge.swift
     entitlements:
