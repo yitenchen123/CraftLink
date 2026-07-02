@@ -90,11 +90,12 @@ class VPNManager: ObservableObject {
         let config = NETunnelProviderProtocol()
         config.providerBundleIdentifier = Constants.packetTunnelBundleId
         config.serverAddress = "CraftLink VPN"
+        // 修复：显式桥接为 NSObject 子类
         config.providerConfiguration = [
-            "inviteCode": inviteCode,
-            "port": port ?? "",
-            "isServer": isServer
-        ] as [String: NSObject]
+            "inviteCode": inviteCode as NSString,
+            "port": (port ?? "") as NSString,
+            "isServer": NSNumber(value: isServer)
+        ]
 
         vpnManager.loadFromPreferences { [weak self] error in
             guard let self = self else { return }
