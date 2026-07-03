@@ -86,7 +86,7 @@ public final class ScaffoldingServer: ObservableObject {
         } catch {
             DispatchQueue.main.async {
                 self.isRunning = false
-                self.lastError = "端口 \(port) 被占用或无权限：\(error.localizedDescription)"
+                self.lastError = "端口 \(self.port) 被占用或无权限：\(error.localizedDescription)"
             }
         }
     }
