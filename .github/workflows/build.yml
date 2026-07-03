@@ -43,28 +43,43 @@ jobs:
         run: |
           APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
           echo "App path: $APP_PATH"
-          # 校验 PacketTunnel.appex 已被 embed 进主 App
           APPEX_PATH="$APP_PATH/PlugIns/PacketTunnel.appex"
           if [ ! -d "$APPEX_PATH" ]; then
             echo "❌ ERROR: PacketTunnel.appex not found at $APPEX_PATH"
-            echo "Bundle contents:"
             find "$APP_PATH" -maxdepth 3 -type d
             exit 1
           fi
+
           # 复制 entitlements 文件到对应包内
           cp CraftLink.entitlements "$APP_PATH/"
           cp PacketTunnel/PacketTunnel.entitlements "$APPEX_PATH/"
-          # 用 ldid 将权限写入二进制文件（TrollStore/越狱环境靠 ldid 嵌入 entitlements）
-          # 关键：必须包含 com.apple.developer.networking.networkextension=packet-tunnel-provider
-          # 否则 NEPacketTunnelProvider 启动会被系统拒绝，报 permission denied
+
+          # 关键修复：CODE_SIGNING_ALLOWED=NO 下 xcodebuild 生成的二进制没有任何签名段，
+          # ldid -S<entitlements> 直接调用会因找不到签名占位符而静默失败（ldid -e 输出为空）。
+          # 必须先用 ldid -S（不带参数）给二进制加 ad-hoc 签名段，再用 -S<entitlements> 写入权限。
+          # TrollStore 安装时会重签，但只有二进制里已嵌入 entitlements 时才会保留。
+          echo "Step 1: ad-hoc fakesign both binaries..."
+          ldid -S "$APP_PATH/CraftLink"
+          ldid -S "$APPEX_PATH/PacketTunnel"
+
+          echo "Step 2: embed entitlements into signed binaries..."
           ldid -S"$APP_PATH/CraftLink.entitlements" "$APP_PATH/CraftLink"
           ldid -S"$APPEX_PATH/PacketTunnel.entitlements" "$APPEX_PATH/PacketTunnel"
-          echo "✅ Entitlements embedded."
-          # 验证 entitlements 已写入
+
+          echo "✅ Entitlements embedded. Verifying..."
           echo "--- CraftLink entitlements ---"
           ldid -e "$APP_PATH/CraftLink"
           echo "--- PacketTunnel entitlements ---"
           ldid -e "$APPEX_PATH/PacketTunnel"
+
+          # 强制校验：如果 entitlements 输出为空，构建失败
+          CRAFT_ENT=$(ldid -e "$APP_PATH/CraftLink" | grep -c "networkextension" || true)
+          TUNNEL_ENT=$(ldid -e "$APPEX_PATH/PacketTunnel" | grep -c "networkextension" || true)
+          if [ "$CRAFT_ENT" -eq 0 ] || [ "$TUNNEL_ENT" -eq 0 ]; then
+            echo "❌ FATAL: entitlements not embedded in binary! ldid -e output empty."
+            exit 1
+          fi
+          echo "✅ Verified: networkextension entitlement present in both binaries."
 
       - name: Package IPA
         run: |
