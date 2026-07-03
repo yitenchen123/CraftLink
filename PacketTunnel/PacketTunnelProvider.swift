@@ -45,10 +45,22 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             return
         }
 
-        let inviteCode = sharedDefaults?.string(forKey: "currentInviteCode") ?? ""
-        let isServer = sharedDefaults?.bool(forKey: "isServer") ?? false
-        let port = sharedDefaults?.string(forKey: "currentPort") ?? ""
-        let networkName = InviteCodeService.networkName(from: inviteCode)
+        let inviteCode = sharedDefaults?.string(forKey: Constants.AppGroupKey.currentInviteCode) ?? ""
+        let isServer = sharedDefaults?.bool(forKey: Constants.AppGroupKey.isServer) ?? false
+        let port = sharedDefaults?.string(forKey: Constants.AppGroupKey.currentPort) ?? ""
+        // 优先读主 App 写入的 networkName/networkSecret/hostname（Scaffolding-MC 协议）
+        var networkName = sharedDefaults?.string(forKey: Constants.AppGroupKey.networkName) ?? ""
+        var networkSecret = sharedDefaults?.string(forKey: Constants.AppGroupKey.networkSecret) ?? ""
+        let hostname = sharedDefaults?.string(forKey: Constants.AppGroupKey.hostname) ?? ""
+        // 兼容 fallback：主 App 没写时从邀请码计算（旧逻辑）
+        if networkName.isEmpty && !inviteCode.isEmpty {
+            networkName = inviteCode.uppercased()
+                .replacingOccurrences(of: "U/", with: "")
+                .replacingOccurrences(of: "-", with: "")
+        }
+        if networkSecret.isEmpty {
+            networkSecret = networkName
+        }
 
         os_log("Starting tunnel: isServer=%{public}d, network=%{public}@, port=%{public}@",
                log: log, type: .info, isServer, networkName, port)
@@ -101,20 +113,25 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 return
             }
 
-            // 启动 EasyTier 网络实例
+            // 启动 EasyTier 网络实例（Scaffolding-MC 协议：network_name/secret 拆分）
+            // 房主额外带 hostname = "scaffolding-mc-server-{port}"，供 EasyTier 网络内识别联机中心
             // 注意：配置里不放 [tun]，避免 EasyTier 尝试自己创建 TUN 设备
             // TUN fd 由下面的 set_tun_fd 从系统 packetFlow 传入
-            let tomlConfig = """
-                instance_name = "craftlink"
-                network_name = "\(networkName)"
-                shared_key = "\(networkName)"
-                listen_port = 0
-                peers = [
-                  "tcp://public.easytier.cn:11010",
-                  "udp://public.easytier.cn:11010"
-                ]
-                enable_ipv6 = false
-                """
+            var tomlLines = [
+                "instance_name = \"craftlink\"",
+                "network_name = \"\(networkName)\"",
+                "shared_key = \"\(networkSecret)\"",
+                "listen_port = 0",
+                "peers = [",
+                "  \"tcp://public.easytier.cn:11010\",",
+                "  \"udp://public.easytier.cn:11010\"",
+                "]",
+                "enable_ipv6 = false"
+            ]
+            if !hostname.isEmpty {
+                tomlLines.insert("hostname = \"\(hostname)\"", at: 1)
+            }
+            let tomlConfig = tomlLines.joined(separator: "\n")
 
             var cfgErrMsg: UnsafePointer<CChar>? = nil
             let runRet = rust_run_network_instance(tomlConfig, &cfgErrMsg)

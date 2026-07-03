@@ -16,6 +16,7 @@ targets:
       - path: Models
       - path: Utils
       - path: ViewModels
+      - path: Core
       - path: Info.plist
       - path: CraftLink.entitlements
     entitlements:
@@ -38,7 +39,6 @@ targets:
     sources:
       - path: PacketTunnel
       - path: Services/Constants.swift
-      - path: Services/InviteCodeService.swift
       - path: Services/RustBridge.swift
     entitlements:
       path: PacketTunnel/PacketTunnel.entitlements

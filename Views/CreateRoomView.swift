@@ -111,6 +111,34 @@ struct CreateRoomView: View {
                         .padding()
                         .background(Color.green.opacity(0.1))
                         .cornerRadius(10)
+
+                        // 房间成员列表（由 ScaffoldingServer 维护）
+                        if !vpnManager.players.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("房间成员（\(vpnManager.players.count)）")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                ForEach(vpnManager.players) { player in
+                                    HStack(spacing: 10) {
+                                        Image(systemName: player.kind == .host ? "crown.fill" : "person.fill")
+                                            .foregroundColor(player.kind == .host ? .orange : .accentColor)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(player.name)
+                                                .font(.subheadline)
+                                            Text("\(player.vendor) · \(player.kind.rawValue)")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                        }
                     } else if let error = vpnManager.lastError {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")

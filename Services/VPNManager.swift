@@ -1,5 +1,8 @@
 import NetworkExtension
 import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum VPNStatus: String {
     case disconnected = "未连接"
@@ -15,12 +18,25 @@ class VPNManager: ObservableObject {
     @Published var currentPort: String?
     @Published var currentRole: RoomRole?
     @Published var lastError: String?
+    /// 当前房间内的玩家列表（房主由 ScaffoldingServer 维护，访客由 ScaffoldingClient 同步）。
+    @Published var players: [PlayerProfile] = []
+    /// 访客已发现的房主 MC 端口（由 ScaffoldingClient 通过 `c:server_port` 获取）。
+    @Published var discoveredMCPort: UInt16?
 
     // 关键修复：用 NETunnelProviderManager 代替 NEVPNManager
     // NEVPNManager 用于系统 VPN（IKEv2/IPSec），管理自定义 PacketTunnelProvider
     // 必须用 NETunnelProviderManager，否则 startTunnel 会被系统拒绝
     private var tunnelManager: NETunnelProviderManager?
     private let sharedDefaults = UserDefaults(suiteName: Constants.appGroupId)
+
+    /// 房主端 Scaffolding 协议服务器。
+    private var scaffoldingServer: ScaffoldingServer?
+    /// 访客端 Scaffolding 协议客户端。
+    private var scaffoldingClient: ScaffoldingClient?
+    /// 访客要连接的房主 MC 端口（用于建立 ScaffoldingClient TCP 连接）。
+    private var hostPort: UInt16?
+    /// Combine 订阅 bag。
+    private var cancellables = Set<AnyCancellable>()
 
     private init() {
         loadPreferences()
@@ -61,7 +77,7 @@ class VPNManager: ObservableObject {
         case .disconnected:
             status = .disconnected
             // 读取 PacketTunnel 写回的具体错误信息
-            if let tunnelErr = sharedDefaults?.string(forKey: "tunnelError") {
+            if let tunnelErr = sharedDefaults?.string(forKey: Constants.AppGroupKey.tunnelError) {
                 DispatchQueue.main.async {
                     self.lastError = tunnelErr
                 }
@@ -71,6 +87,11 @@ class VPNManager: ObservableObject {
         case .connected:
             status = .connected
             lastError = nil
+            // VPN 连接成功后启动 Scaffolding 协议层：
+            // 访客此时虚拟网络已就绪，可连接房主 10.0.0.1:{hostPort}
+            DispatchQueue.main.async {
+                self.startScaffoldingIfNeeded()
+            }
         case .disconnecting:
             status = .disconnecting
         case .invalid:
@@ -83,17 +104,26 @@ class VPNManager: ObservableObject {
     }
 
     func createRoom(inviteCode: String, port: String, completion: @escaping (Error?) -> Void) {
-        configureAndStart(inviteCode: inviteCode, port: port, isServer: true, completion: completion)
+        configureAndStart(inviteCode: inviteCode, port: port, isServer: true, hostPort: nil, completion: completion)
     }
 
     func joinRoom(inviteCode: String, completion: @escaping (Error?) -> Void) {
-        configureAndStart(inviteCode: inviteCode, port: nil, isServer: false, completion: completion)
+        configureAndStart(inviteCode: inviteCode, port: nil, isServer: false, hostPort: nil, completion: completion)
     }
 
-    private func configureAndStart(inviteCode: String, port: String?, isServer: Bool, completion: @escaping (Error?) -> Void) {
-        guard InviteCodeService.isValid(inviteCode) else {
+    /// 加入房间（指定房主 MC 端口，用于建立 Scaffolding 协议连接）。
+    /// - Parameters:
+    ///   - inviteCode: Scaffolding-MC 邀请码
+    ///   - hostPort: 房主 MC 端口（= Scaffolding 协议端口）。nil 时仅建立 VPN，不启动协议客户端。
+    func joinRoom(inviteCode: String, hostPort: UInt16?, completion: @escaping (Error?) -> Void) {
+        configureAndStart(inviteCode: inviteCode, port: nil, isServer: false, hostPort: hostPort, completion: completion)
+    }
+
+    private func configureAndStart(inviteCode: String, port: String?, isServer: Bool, hostPort: UInt16?, completion: @escaping (Error?) -> Void) {
+        // 1. 校验邀请码（Scaffolding-MC 标准格式 + 被 7 整除校验）
+        guard let parsed = ScaffoldingInviteCode.parse(inviteCode) else {
             let error = NSError(domain: "CraftLink", code: -1,
-                                userInfo: [NSLocalizedDescriptionKey: "邀请码格式错误"])
+                                userInfo: [NSLocalizedDescriptionKey: "邀请码格式错误（应为 U/NNNN-NNNN-SSSS-SSSS）"])
             DispatchQueue.main.async {
                 self.lastError = error.localizedDescription
                 completion(error)
@@ -101,14 +131,57 @@ class VPNManager: ObservableObject {
             return
         }
 
+        // 2. 房主模式校验端口
+        var mcPort: UInt16? = nil
+        if isServer {
+            guard let portStr = port, let p = UInt16(portStr), p > 0 else {
+                let error = NSError(domain: "CraftLink", code: -2,
+                                    userInfo: [NSLocalizedDescriptionKey: "请输入有效的 Minecraft 端口（1-65535）"])
+                DispatchQueue.main.async {
+                    self.lastError = error.localizedDescription
+                    completion(error)
+                }
+                return
+            }
+            mcPort = p
+        }
+
+        // 清理上一次会话残留的 Scaffolding 协议层（避免重复 join 时旧 client 阻止新连接）
+        scaffoldingServer?.stop()
+        scaffoldingServer = nil
+        scaffoldingClient?.disconnect()
+        scaffoldingClient = nil
+        cancellables.removeAll()
+        players = []
+        discoveredMCPort = nil
+
         currentInviteCode = inviteCode
         currentPort = port
         currentRole = isServer ? .host : .client
+        self.hostPort = hostPort
 
-        sharedDefaults?.set(inviteCode, forKey: "currentInviteCode")
-        sharedDefaults?.set(port ?? "", forKey: "currentPort")
-        sharedDefaults?.set(isServer, forKey: "isServer")
+        // 3. 写入 App Group，供 PacketTunnel 读取 EasyTier 配置
+        sharedDefaults?.set(inviteCode, forKey: Constants.AppGroupKey.currentInviteCode)
+        sharedDefaults?.set(port ?? "", forKey: Constants.AppGroupKey.currentPort)
+        sharedDefaults?.set(isServer, forKey: Constants.AppGroupKey.isServer)
+        sharedDefaults?.set(parsed.networkName, forKey: Constants.AppGroupKey.networkName)
+        sharedDefaults?.set(parsed.networkSecret, forKey: Constants.AppGroupKey.networkSecret)
+        if isServer, let mcPort = mcPort {
+            // 房主 hostname = scaffolding-mc-server-{port}，供 EasyTier 网络内识别联机中心
+            let hostname = ScaffoldingInviteCode.serverHostname(mcPort: mcPort)
+            sharedDefaults?.set(hostname, forKey: Constants.AppGroupKey.hostname)
+            sharedDefaults?.set(Int(mcPort), forKey: Constants.AppGroupKey.mcPort)
+        } else {
+            sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.hostname)
+            sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.mcPort)
+        }
         sharedDefaults?.synchronize()
+
+        // 4. 房主：立即启动 ScaffoldingServer（监听 MC 端口，bind 到所有接口）
+        //    访客：等 VPN connected 后在 startScaffoldingIfNeeded() 中启动 ScaffoldingClient
+        if isServer, let mcPort = mcPort {
+            startHostScaffoldingServer(mcPort: mcPort)
+        }
 
         // 准备隧道配置
         let config = NETunnelProviderProtocol()
@@ -199,7 +272,7 @@ class VPNManager: ObservableObject {
                         }
                         // 延迟再读一次 tunnelError，PacketTunnel 可能在 completionHandler 里写了
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            if let tunnelErr = self.sharedDefaults?.string(forKey: "tunnelError"),
+                            if let tunnelErr = self.sharedDefaults?.string(forKey: Constants.AppGroupKey.tunnelError),
                                !tunnelErr.isEmpty {
                                 self.lastError = tunnelErr
                             }
@@ -210,18 +283,96 @@ class VPNManager: ObservableObject {
         }
     }
 
+    // MARK: - Scaffolding 协议层生命周期
+
+    /// 房主：启动 ScaffoldingServer 并订阅玩家列表。
+    private func startHostScaffoldingServer(mcPort: UInt16) {
+        scaffoldingServer?.stop()
+        let hostProfile = PlayerProfile(
+            name: deviceDisplayName(),
+            machineId: PlayerProfileUtil.stableMachineId(),
+            vendor: Constants.vendor,
+            kind: .host
+        )
+        let server = ScaffoldingServer(port: mcPort, hostProfile: hostProfile)
+        server.$players
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.players, on: self)
+            .store(in: &cancellables)
+        server.$lastError
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] err in
+                if let err = err { self?.lastError = err }
+            }
+            .store(in: &cancellables)
+        server.start()
+        scaffoldingServer = server
+    }
+
+    /// 访客：VPN 连接成功后启动 ScaffoldingClient 连接房主 10.0.0.1:{hostPort}。
+    private func startScaffoldingIfNeeded() {
+        guard currentRole == .client, scaffoldingClient == nil, let port = hostPort else { return }
+        let guestProfile = PlayerProfile(
+            name: deviceDisplayName(),
+            machineId: PlayerProfileUtil.stableMachineId(),
+            vendor: Constants.vendor,
+            kind: .guest
+        )
+        let client = ScaffoldingClient(hostIP: Constants.serverIP, port: port, localProfile: guestProfile)
+        client.$players
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.players, on: self)
+            .store(in: &cancellables)
+        client.$mcPort
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.discoveredMCPort, on: self)
+            .store(in: &cancellables)
+        client.$lastError
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] err in
+                if let err = err { self?.lastError = err }
+            }
+            .store(in: &cancellables)
+        client.connect()
+        scaffoldingClient = client
+    }
+
+    /// 用于 PlayerProfile.name 的设备显示名。
+    private func deviceDisplayName() -> String {
+        #if canImport(UIKit)
+        return UIDevice.current.name
+        #else
+        return ProcessInfo.processInfo.hostName
+        #endif
+    }
+
     func stopVPN() {
         tunnelManager?.connection.stopVPNTunnel()
+
+        // 停止 Scaffolding 协议层
+        scaffoldingServer?.stop()
+        scaffoldingServer = nil
+        scaffoldingClient?.disconnect()
+        scaffoldingClient = nil
+        cancellables.removeAll()
+        hostPort = nil
+        players = []
+        discoveredMCPort = nil
 
         currentInviteCode = nil
         currentPort = nil
         currentRole = nil
         lastError = nil
 
-        sharedDefaults?.removeObject(forKey: "currentInviteCode")
-        sharedDefaults?.removeObject(forKey: "currentPort")
-        sharedDefaults?.removeObject(forKey: "isServer")
-        sharedDefaults?.removeObject(forKey: "tunnelError")
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.currentInviteCode)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.currentPort)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.isServer)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.networkName)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.networkSecret)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.hostname)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.mcPort)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.tunnelError)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.tunnelErrorTime)
         sharedDefaults?.synchronize()
     }
 }
