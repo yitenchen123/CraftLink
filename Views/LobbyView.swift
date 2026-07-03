@@ -47,6 +47,13 @@ struct LobbyView: View {
                     .background(statusColor.opacity(0.1))
                     .cornerRadius(20)
 
+                    // 连接中显示 PacketTunnel 上报的具体阶段
+                    if !vpnManager.stageDescription.isEmpty {
+                        Text(vpnManager.stageDescription)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
                     HStack(spacing: 20) {
                         Button(action: { showCreate = true }) {
                             VStack(spacing: 8) {

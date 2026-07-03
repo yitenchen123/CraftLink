@@ -102,15 +102,28 @@ struct CreateRoomView: View {
                     }
 
                     if vpnManager.status == .connected {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.seal.fill")
-                                .foregroundColor(.green)
-                            Text("VPN 已连接，其他玩家可通过邀请码加入")
-                                .font(.subheadline)
+                        // EasyTier 还在异步启动中：显示进度而非「已连接」
+                        if vpnManager.tunnelStage != "ready" {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text(vpnManager.stageDescription.isEmpty ? "正在启动虚拟网络..." : vpnManager.stageDescription)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(10)
+                        } else {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .foregroundColor(.green)
+                                Text("VPN 已连接，其他玩家可通过邀请码加入")
+                                    .font(.subheadline)
+                            }
+                            .padding()
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(10)
                         }
-                        .padding()
-                        .background(Color.green.opacity(0.1))
-                        .cornerRadius(10)
 
                         // 房间成员列表（由 ScaffoldingServer 维护）
                         if !vpnManager.players.isEmpty {

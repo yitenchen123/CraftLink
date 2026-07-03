@@ -22,6 +22,10 @@ class VPNManager: ObservableObject {
     @Published var players: [PlayerProfile] = []
     /// 访客已发现的房主 MC 端口（由 ScaffoldingClient 通过 `c:server_port` 获取）。
     @Published var discoveredMCPort: UInt16?
+    /// PacketTunnel 上报的启动阶段原始值（init_logger / tun_ready / easytier_starting / ready / failed）。
+    @Published var tunnelStage: String?
+    /// 给 UI 显示的中文阶段描述。
+    @Published var stageDescription: String = ""
 
     // 关键修复：用 NETunnelProviderManager 代替 NEVPNManager
     // NEVPNManager 用于系统 VPN（IKEv2/IPSec），管理自定义 PacketTunnelProvider
@@ -37,6 +41,10 @@ class VPNManager: ObservableObject {
     private var hostPort: UInt16?
     /// Combine 订阅 bag。
     private var cancellables = Set<AnyCancellable>()
+    /// 轮询 PacketTunnel 阶段的定时器（仅在 connecting/connected 状态下运行）。
+    private var stageTimer: Timer?
+    /// 标记 EasyTier 是否已就绪，避免重复触发 ScaffoldingClient 启动。
+    private var easytierReadyHandled = false
 
     private init() {
         loadPreferences()
@@ -71,35 +79,99 @@ class VPNManager: ObservableObject {
     private func updateStatus() {
         guard let connection = tunnelManager?.connection else {
             status = .disconnected
+            stopStageTimer()
             return
         }
         switch connection.status {
         case .disconnected:
             status = .disconnected
+            stopStageTimer()
             // 读取 PacketTunnel 写回的具体错误信息
-            if let tunnelErr = sharedDefaults?.string(forKey: Constants.AppGroupKey.tunnelError) {
+            if let tunnelErr = sharedDefaults?.string(forKey: Constants.AppGroupKey.tunnelError),
+               !tunnelErr.isEmpty {
                 DispatchQueue.main.async {
                     self.lastError = tunnelErr
                 }
             }
         case .connecting:
             status = .connecting
+            startStageTimer()
         case .connected:
             status = .connected
             lastError = nil
-            // VPN 连接成功后启动 Scaffolding 协议层：
-            // 访客此时虚拟网络已就绪，可连接房主 10.0.0.1:{hostPort}
-            DispatchQueue.main.async {
-                self.startScaffoldingIfNeeded()
-            }
+            // 不再立即启动 ScaffoldingClient：EasyTier 此时可能还在异步启动中（PacketTunnel
+            // 已 completionHandler(nil) 让 iOS 进入 connected，但虚拟网络可能尚未真正通）。
+            // 由 pollStage 在 stage=="ready" 时触发 startScaffoldingIfNeeded。
+            startStageTimer()
+            // 立即轮询一次，加速 stage 已就绪时的响应
+            pollStage()
         case .disconnecting:
             status = .disconnecting
+            stopStageTimer()
         case .invalid:
             status = .disconnected
+            stopStageTimer()
         case .reasserting:
             status = .connecting
+            startStageTimer()
         @unknown default:
             status = .disconnected
+            stopStageTimer()
+        }
+    }
+
+    // MARK: - 阶段轮询
+
+    /// 启动 0.5 秒间隔的 stage 轮询 timer。
+    private func startStageTimer() {
+        if stageTimer != nil { return }
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.pollStage()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        stageTimer = timer
+        // 立即跑一次
+        pollStage()
+    }
+
+    private func stopStageTimer() {
+        stageTimer?.invalidate()
+        stageTimer = nil
+    }
+
+    /// 读 App Group 的 tunnelStage，更新 UI 阶段描述；stage=ready 时启动 ScaffoldingClient。
+    private func pollStage() {
+        let stage = sharedDefaults?.string(forKey: Constants.AppGroupKey.tunnelStage)
+        if stage != tunnelStage {
+            tunnelStage = stage
+            stageDescription = describeStage(stage)
+        }
+
+        // EasyTier 就绪 → 启动访客 ScaffoldingClient（仅一次）
+        if stage == "ready", !easytierReadyHandled {
+            easytierReadyHandled = true
+            startScaffoldingIfNeeded()
+        }
+
+        // 失败阶段 → 同步错误信息到 lastError
+        if let stage = stage, stage.hasPrefix("failed") {
+            if let err = sharedDefaults?.string(forKey: Constants.AppGroupKey.tunnelError),
+               !err.isEmpty {
+                lastError = err
+            }
+        }
+    }
+
+    /// 把 PacketTunnel 上报的阶段原始值翻译成中文描述。
+    private func describeStage(_ stage: String?) -> String {
+        guard let stage = stage else { return "" }
+        switch stage {
+        case "init_logger": return "正在初始化日志系统..."
+        case "tun_ready": return "虚拟网卡已就绪，正在启动 EasyTier..."
+        case "easytier_starting": return "正在启动 EasyTier 网络实例..."
+        case "ready": return "虚拟网络已就绪"
+        default:
+            return stage.hasPrefix("failed") ? "启动失败" : ""
         }
     }
 
@@ -154,6 +226,9 @@ class VPNManager: ObservableObject {
         cancellables.removeAll()
         players = []
         discoveredMCPort = nil
+        easytierReadyHandled = false
+        tunnelStage = nil
+        stageDescription = ""
 
         currentInviteCode = inviteCode
         currentPort = port
@@ -349,6 +424,9 @@ class VPNManager: ObservableObject {
     func stopVPN() {
         tunnelManager?.connection.stopVPNTunnel()
 
+        // 停止阶段轮询
+        stopStageTimer()
+
         // 停止 Scaffolding 协议层
         scaffoldingServer?.stop()
         scaffoldingServer = nil
@@ -358,6 +436,9 @@ class VPNManager: ObservableObject {
         hostPort = nil
         players = []
         discoveredMCPort = nil
+        easytierReadyHandled = false
+        tunnelStage = nil
+        stageDescription = ""
 
         currentInviteCode = nil
         currentPort = nil
@@ -373,6 +454,8 @@ class VPNManager: ObservableObject {
         sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.mcPort)
         sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.tunnelError)
         sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.tunnelErrorTime)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.tunnelStage)
+        sharedDefaults?.removeObject(forKey: Constants.AppGroupKey.tunnelStageTime)
         sharedDefaults?.synchronize()
     }
 }

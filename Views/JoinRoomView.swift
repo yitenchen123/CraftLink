@@ -88,6 +88,18 @@ struct JoinRoomView: View {
                     .padding(.horizontal)
 
                     if vpnManager.status == .connected {
+                        // EasyTier 还在异步启动中：ScaffoldingClient 尚未连接房主，显示进度
+                        if vpnManager.tunnelStage != "ready" {
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .scaleEffect(1.2)
+                                Text(vpnManager.stageDescription.isEmpty ? "正在启动虚拟网络..." : vpnManager.stageDescription)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(.horizontal)
+                        } else {
                         VStack(spacing: 16) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
@@ -153,6 +165,7 @@ struct JoinRoomView: View {
                             }
                         }
                         .padding(.horizontal)
+                        }
                     } else if let error = vpnManager.lastError {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill")

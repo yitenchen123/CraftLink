@@ -55,6 +55,11 @@ enum Constants {
         public static let tunnelError = "tunnelError"
         /// tunnelError 的时间戳。
         public static let tunnelErrorTime = "tunnelErrorTime"
+        /// PacketTunnel 启动阶段标识（主 App 据此显示进度）：
+        /// `init_logger` / `tun_ready` / `easytier_starting` / `ready` / `failed`。
+        public static let tunnelStage = "tunnelStage"
+        /// tunnelStage 的时间戳。
+        public static let tunnelStageTime = "tunnelStageTime"
     }
 
     // MARK: - Legacy（保留以兼容旧代码引用）
