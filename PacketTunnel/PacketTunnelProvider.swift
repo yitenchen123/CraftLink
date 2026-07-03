@@ -3,8 +3,24 @@ import OSLog
 
 class PacketTunnelProvider: NEPacketTunnelProvider {
     private let log = OSLog(subsystem: "com.craftlink", category: "PacketTunnel")
+    private let sharedDefaults = UserDefaults(suiteName: Constants.appGroupId)
+
+    /// 把错误信息写回 App Group，让主 App 能读到具体失败原因
+    private func reportError(_ message: String, code: Int) -> Error {
+        let error = NSError(domain: "CraftLink", code: code,
+                            userInfo: [NSLocalizedDescriptionKey: message])
+        sharedDefaults?.set(message, forKey: "tunnelError")
+        sharedDefaults?.set(Date().timeIntervalSince1970, forKey: "tunnelErrorTime")
+        sharedDefaults?.synchronize()
+        os_log("TUNNEL ERROR: %{public}@", log: log, type: .error, message)
+        return error
+    }
 
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
+        // 清除上次的错误记录
+        sharedDefaults?.removeObject(forKey: "tunnelError")
+        sharedDefaults?.synchronize()
+
         // 日志写入 App Group 共享容器，避免 Rust 侧因路径权限返回 permission denied
         let logPath: String
         if let groupURL = FileManager.default
@@ -25,12 +41,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         if ret != 0, let msg = errMsg {
             let errorMsg = String(cString: msg)
             rust_free_string(msg)
-            completionHandler(NSError(domain: "CraftLink", code: -1,
-                                      userInfo: [NSLocalizedDescriptionKey: "日志初始化失败: \(errorMsg)"]))
+            completionHandler(reportError("日志初始化失败: \(errorMsg)", code: -1))
             return
         }
 
-        let sharedDefaults = UserDefaults(suiteName: Constants.appGroupId)
         let inviteCode = sharedDefaults?.string(forKey: "currentInviteCode") ?? ""
         let isServer = sharedDefaults?.bool(forKey: "isServer") ?? false
         let port = sharedDefaults?.string(forKey: "currentPort") ?? ""
@@ -61,7 +75,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             guard let self = self else { return }
             if let error = error {
                 os_log("setTunnelNetworkSettings failed: %{public}@", log: self.log, type: .error, error.localizedDescription)
-                completionHandler(error)
+                completionHandler(self.reportError("VPN 网络配置失败: \(error.localizedDescription)", code: -5))
                 return
             }
 
@@ -80,11 +94,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
             if fd < 0 {
                 os_log("Failed to obtain TUN fd from packetFlow", log: self.log, type: .error)
-                completionHandler(NSError(
-                    domain: "CraftLink",
-                    code: -3,
-                    userInfo: [NSLocalizedDescriptionKey:
-                        "TUN 文件描述符获取失败：iOS 沙盒拒绝访问 packetFlow 私有属性。请确认使用 TrollStore/越狱环境安装。"]
+                completionHandler(self.reportError(
+                    "TUN 文件描述符获取失败：iOS 沙盒拒绝访问 packetFlow 私有属性。请确认使用 TrollStore/越狱环境安装，且 iOS 版本为 14.0-16.6.1 或 17.0。",
+                    code: -3
                 ))
                 return
             }
@@ -110,8 +122,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 let errorMsg = String(cString: msg)
                 rust_free_string(msg)
                 os_log("run_network_instance failed: %{public}@", log: self.log, type: .error, errorMsg)
-                completionHandler(NSError(domain: "CraftLink", code: -2,
-                                          userInfo: [NSLocalizedDescriptionKey: "网络实例启动失败: \(errorMsg)"]))
+                completionHandler(self.reportError("EasyTier 网络实例启动失败: \(errorMsg)", code: -2))
                 return
             }
 
@@ -122,8 +133,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
                 let errorMsg = String(cString: msg)
                 rust_free_string(msg)
                 _ = rust_stop_network_instance()
-                completionHandler(NSError(domain: "CraftLink", code: -4,
-                                          userInfo: [NSLocalizedDescriptionKey: "TUN FD 设置失败: \(errorMsg)"]))
+                completionHandler(self.reportError("TUN FD 设置失败: \(errorMsg)", code: -4))
                 return
             }
             os_log("TUN FD set successfully: %{public}d", log: self.log, type: .info, fd)

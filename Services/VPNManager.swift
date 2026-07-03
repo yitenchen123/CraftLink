@@ -60,6 +60,12 @@ class VPNManager: ObservableObject {
         switch connection.status {
         case .disconnected:
             status = .disconnected
+            // 读取 PacketTunnel 写回的具体错误信息
+            if let tunnelErr = sharedDefaults?.string(forKey: "tunnelError") {
+                DispatchQueue.main.async {
+                    self.lastError = tunnelErr
+                }
+            }
         case .connecting:
             status = .connecting
         case .connected:
@@ -183,36 +189,20 @@ class VPNManager: ObservableObject {
                             completion(nil)
                         }
                     } catch {
-                        let message: String
-                        if let neError = error as? NEVPNError {
-                            switch neError.code {
-                            case .configurationReadWriteFailed:
-                                message = "VPN 配置读写失败，请检查 VPN 权限后重试"
-                            case .configurationStale:
-                                message = "VPN 配置已过期，正在重新加载..."
-                                manager.loadFromPreferences { _ in
-                                    do {
-                                        try session.startTunnel(options: nil)
-                                        DispatchQueue.main.async { completion(nil) }
-                                    } catch {
-                                        DispatchQueue.main.async {
-                                            self.lastError = error.localizedDescription
-                                            completion(error)
-                                        }
-                                    }
-                                }
-                                return
-                            case .connectionFailed:
-                                message = "VPN 连接失败：\(error.localizedDescription)"
-                            default:
-                                message = error.localizedDescription
-                            }
-                        } else {
-                            message = error.localizedDescription
-                        }
+                        // startTunnel 立即抛异常 = extension 无法加载（签名/权限问题）
+                        // 延迟读取 tunnelError（PacketTunnel 可能已写入更具体的错误）
+                        let nsError = error as NSError
+                        let detail = "[错误码 \(nsError.domain):\(nsError.code)] \(error.localizedDescription)"
                         DispatchQueue.main.async {
-                            self.lastError = message
+                            self.lastError = detail
                             completion(error)
+                        }
+                        // 延迟再读一次 tunnelError，PacketTunnel 可能在 completionHandler 里写了
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            if let tunnelErr = self.sharedDefaults?.string(forKey: "tunnelError"),
+                               !tunnelErr.isEmpty {
+                                self.lastError = tunnelErr
+                            }
                         }
                     }
                 }
@@ -231,6 +221,7 @@ class VPNManager: ObservableObject {
         sharedDefaults?.removeObject(forKey: "currentInviteCode")
         sharedDefaults?.removeObject(forKey: "currentPort")
         sharedDefaults?.removeObject(forKey: "isServer")
+        sharedDefaults?.removeObject(forKey: "tunnelError")
         sharedDefaults?.synchronize()
     }
 }
