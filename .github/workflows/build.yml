@@ -26,15 +26,17 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Restore entitlements (xcodegen generate 会清空 entitlements 文件)
+      - name: Restore entitlements and PacketTunnel Info.plist (xcodegen generate 会清空这些文件)
         run: |
-          # 真因：xcodegen generate 会把 project.yml 中引用的 .entitlements 文件
-          # 重写成空 <dict/>。必须在 generate 之后、xcodebuild 之前重新写回完整内容，
-          # 否则 ldid 嵌入的 entitlements 是空的，TrollStore 安装后
-          # NEPacketTunnelProvider 加载被系统拒绝 → permission denied。
-          # 用 python 写文件，避免 heredoc 在 YAML 里的缩进问题。
+          # 真因 1：xcodegen generate 会把 .entitlements 文件重写成空 <dict/>，
+          #         导致 ldid 嵌入空权限，TrollStore 安装后 permission denied。
+          # 真因 2：xcodegen generate 会重写 PacketTunnel/Info.plist，丢失
+          #         NSExtension 字段。iOS 找不到 NSExtensionPointIdentifier，
+          #         不认为这是合法的 Packet Tunnel extension，显示"需要更新"并拒绝启动。
+          # 修复：在 generate 之后、xcodebuild 之前，用 python 重新写回完整内容。
           python3 - <<'PYEOF'
-          content = '''<?xml version="1.0" encoding="UTF-8"?>
+          # 1. 恢复 entitlements 文件
+          ent_content = '''<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
@@ -49,14 +51,53 @@ jobs:
           </dict>
           </plist>
           '''
-          # 去掉每行前导空格（YAML 缩进），保留 XML 结构
-          lines = [line.strip() if line.strip() else line for line in content.split('\n')]
-          cleaned = '\n'.join(lines) + '\n'
+          ent_lines = [line.strip() if line.strip() else line for line in ent_content.split('\n')]
+          ent_cleaned = '\n'.join(ent_lines) + '\n'
           for path in ['CraftLink.entitlements', 'PacketTunnel/PacketTunnel.entitlements']:
               with open(path, 'w') as f:
-                  f.write(cleaned)
+                  f.write(ent_cleaned)
               print(f"=== {path} ===")
-              print(cleaned)
+              print(ent_cleaned)
+
+          # 2. 恢复 PacketTunnel/Info.plist（必须包含 NSExtension 字段）
+          info_content = '''<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>$(DEVELOPMENT_LANGUAGE)</string>
+              <key>CFBundleDisplayName</key>
+              <string>CraftLink VPN</string>
+              <key>CFBundleExecutable</key>
+              <string>$(EXECUTABLE_NAME)</string>
+              <key>CFBundleIdentifier</key>
+              <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>$(PRODUCT_NAME)</string>
+              <key>CFBundlePackageType</key>
+              <string>XPC!</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>NSExtension</key>
+              <dict>
+                  <key>NSExtensionPointIdentifier</key>
+                  <string>com.apple.networkextension.packet-tunnel</string>
+                  <key>NSExtensionPrincipalClass</key>
+                  <string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string>
+              </dict>
+          </dict>
+          </plist>
+          '''
+          info_lines = [line.strip() if line.strip() else line for line in info_content.split('\n')]
+          info_cleaned = '\n'.join(info_lines) + '\n'
+          with open('PacketTunnel/Info.plist', 'w') as f:
+              f.write(info_cleaned)
+          print("=== PacketTunnel/Info.plist ===")
+          print(info_cleaned)
           PYEOF
 
       - name: Build unsigned .app
@@ -123,6 +164,16 @@ jobs:
             exit 1
           fi
           echo "✅ Verified: networkextension entitlement present in both binaries."
+
+          # 校验 PacketTunnel.appex/Info.plist 包含 NSExtension 字段
+          # 这是 iOS 识别 Packet Tunnel extension 的关键，缺失会导致"需要更新"提示
+          echo "=== 校验 PacketTunnel.appex/Info.plist 的 NSExtension 字段 ==="
+          plutil -extract NSExtension xml1 "$APPEX_PATH/Info.plist" -o - || {
+            echo "❌ FATAL: PacketTunnel.appex/Info.plist 缺少 NSExtension 字段！"
+            echo 'iOS 无法识别这是 Packet Tunnel extension，会显示「需要更新」并拒绝启动。'
+            exit 1
+          }
+          echo "✅ NSExtension 字段存在。"
 
       - name: Package IPA
         run: |
