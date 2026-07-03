@@ -42,13 +42,29 @@ jobs:
       - name: Embed entitlements into binaries
         run: |
           APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
-          # 确保 entitlements 文件已复制到 app 包内
+          echo "App path: $APP_PATH"
+          # 校验 PacketTunnel.appex 已被 embed 进主 App
+          APPEX_PATH="$APP_PATH/PlugIns/PacketTunnel.appex"
+          if [ ! -d "$APPEX_PATH" ]; then
+            echo "❌ ERROR: PacketTunnel.appex not found at $APPEX_PATH"
+            echo "Bundle contents:"
+            find "$APP_PATH" -maxdepth 3 -type d
+            exit 1
+          fi
+          # 复制 entitlements 文件到对应包内
           cp CraftLink.entitlements "$APP_PATH/"
-          cp PacketTunnel/PacketTunnel.entitlements "$APP_PATH/PlugIns/PacketTunnel.appex/"
-          # 用 ldid 将权限写入二进制文件（越狱环境专用，但无害）
+          cp PacketTunnel/PacketTunnel.entitlements "$APPEX_PATH/"
+          # 用 ldid 将权限写入二进制文件（TrollStore/越狱环境靠 ldid 嵌入 entitlements）
+          # 关键：必须包含 com.apple.developer.networking.networkextension=packet-tunnel-provider
+          # 否则 NEPacketTunnelProvider 启动会被系统拒绝，报 permission denied
           ldid -S"$APP_PATH/CraftLink.entitlements" "$APP_PATH/CraftLink"
-          ldid -S"$APP_PATH/PlugIns/PacketTunnel.appex/PacketTunnel.entitlements" "$APP_PATH/PlugIns/PacketTunnel.appex/PacketTunnel"
+          ldid -S"$APPEX_PATH/PacketTunnel.entitlements" "$APPEX_PATH/PacketTunnel"
           echo "✅ Entitlements embedded."
+          # 验证 entitlements 已写入
+          echo "--- CraftLink entitlements ---"
+          ldid -e "$APP_PATH/CraftLink"
+          echo "--- PacketTunnel entitlements ---"
+          ldid -e "$APPEX_PATH/PacketTunnel"
 
       - name: Package IPA
         run: |
