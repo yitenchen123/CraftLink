@@ -26,6 +26,39 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Restore entitlements (xcodegen generate 会清空 entitlements 文件)
+        run: |
+          # 真因：xcodegen generate 会把 project.yml 中引用的 .entitlements 文件
+          # 重写成空 <dict/>。必须在 generate 之后、xcodebuild 之前重新写回完整内容，
+          # 否则 ldid 嵌入的 entitlements 是空的，TrollStore 安装后
+          # NEPacketTunnelProvider 加载被系统拒绝 → permission denied。
+          # 用 python 写文件，避免 heredoc 在 YAML 里的缩进问题。
+          python3 - <<'PYEOF'
+          content = '''<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.developer.networking.networkextension</key>
+              <array>
+                  <string>packet-tunnel-provider</string>
+              </array>
+              <key>com.apple.security.application-groups</key>
+              <array>
+                  <string>group.com.craftlink</string>
+              </array>
+          </dict>
+          </plist>
+          '''
+          # 去掉每行前导空格（YAML 缩进），保留 XML 结构
+          lines = [line.strip() if line.strip() else line for line in content.split('\n')]
+          cleaned = '\n'.join(lines) + '\n'
+          for path in ['CraftLink.entitlements', 'PacketTunnel/PacketTunnel.entitlements']:
+              with open(path, 'w') as f:
+                  f.write(cleaned)
+              print(f"=== {path} ===")
+              print(cleaned)
+          PYEOF
+
       - name: Build unsigned .app
         run: |
           xcodebuild build \
