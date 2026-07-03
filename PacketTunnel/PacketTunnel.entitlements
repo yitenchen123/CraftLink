@@ -2,6 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- 真因修复：NEPacketTunnelProvider 启动必需的 NetworkExtension 权限。
+         缺少此项，iOS 系统会在加载 PacketTunnel.appex 时直接拒绝并报
+         "启动失败 permission denied"，根本不会执行到 Rust 代码。 -->
+    <key>com.apple.developer.networking.networkextension</key>
+    <array>
+        <string>packet-tunnel-provider</string>
+    </array>
     <key>com.apple.security.application-groups</key>
     <array>
         <string>group.com.craftlink</string>
