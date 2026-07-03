@@ -50,14 +50,22 @@ jobs:
             exit 1
           fi
 
+          # 用 plutil 规范化 entitlements 文件，去除 BOM/CR LF/注释等潜在解析问题
+          plutil -convert xml1 CraftLink.entitlements
+          plutil -convert xml1 PacketTunnel/PacketTunnel.entitlements
+          echo "=== CraftLink.entitlements (normalized) ==="
+          cat CraftLink.entitlements
+          echo "=== PacketTunnel.entitlements (normalized) ==="
+          cat PacketTunnel/PacketTunnel.entitlements
+          # 校验 plist 合法
+          plutil -lint CraftLink.entitlements
+          plutil -lint PacketTunnel/PacketTunnel.entitlements
+
           # 复制 entitlements 文件到对应包内
           cp CraftLink.entitlements "$APP_PATH/"
           cp PacketTunnel/PacketTunnel.entitlements "$APPEX_PATH/"
 
-          # 关键修复：CODE_SIGNING_ALLOWED=NO 下 xcodebuild 生成的二进制没有任何签名段，
-          # ldid -S<entitlements> 直接调用会因找不到签名占位符而静默失败（ldid -e 输出为空）。
-          # 必须先用 ldid -S（不带参数）给二进制加 ad-hoc 签名段，再用 -S<entitlements> 写入权限。
-          # TrollStore 安装时会重签，但只有二进制里已嵌入 entitlements 时才会保留。
+          # CODE_SIGNING_ALLOWED=NO 下二进制没有签名段，先 ad-hoc fakesign 再嵌权限
           echo "Step 1: ad-hoc fakesign both binaries..."
           ldid -S "$APP_PATH/CraftLink"
           ldid -S "$APPEX_PATH/PacketTunnel"
@@ -75,6 +83,8 @@ jobs:
           # 强制校验：如果 entitlements 输出为空，构建失败
           CRAFT_ENT=$(ldid -e "$APP_PATH/CraftLink" | grep -c "networkextension" || true)
           TUNNEL_ENT=$(ldid -e "$APPEX_PATH/PacketTunnel" | grep -c "networkextension" || true)
+          echo "CraftLink networkextension count: $CRAFT_ENT"
+          echo "PacketTunnel networkextension count: $TUNNEL_ENT"
           if [ "$CRAFT_ENT" -eq 0 ] || [ "$TUNNEL_ENT" -eq 0 ]; then
             echo "❌ FATAL: entitlements not embedded in binary! ldid -e output empty."
             exit 1
