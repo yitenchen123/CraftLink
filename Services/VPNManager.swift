@@ -16,7 +16,10 @@ class VPNManager: ObservableObject {
     @Published var currentRole: RoomRole?
     @Published var lastError: String?
 
-    private let vpnManager = NEVPNManager.shared()
+    // 关键修复：用 NETunnelProviderManager 代替 NEVPNManager
+    // NEVPNManager 用于系统 VPN（IKEv2/IPSec），管理自定义 PacketTunnelProvider
+    // 必须用 NETunnelProviderManager，否则 startTunnel 会被系统拒绝
+    private var tunnelManager: NETunnelProviderManager?
     private let sharedDefaults = UserDefaults(suiteName: Constants.appGroupId)
 
     private init() {
@@ -25,7 +28,13 @@ class VPNManager: ObservableObject {
     }
 
     private func loadPreferences() {
-        vpnManager.loadFromPreferences { _ in }
+        NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, _ in
+            // 找到已有的 CraftLink 配置，或准备创建新的
+            self?.tunnelManager = managers?.first(where: {
+                ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == Constants.packetTunnelBundleId
+            }) ?? NETunnelProviderManager()
+            self?.updateStatus()
+        }
     }
 
     private func observeStatus() {
@@ -39,23 +48,31 @@ class VPNManager: ObservableObject {
 
     @objc private func vpnStatusChanged() {
         DispatchQueue.main.async {
-            switch self.vpnManager.connection.status {
-            case .disconnected:
-                self.status = .disconnected
-            case .connecting:
-                self.status = .connecting
-            case .connected:
-                self.status = .connected
-                self.lastError = nil
-            case .disconnecting:
-                self.status = .disconnecting
-            case .invalid:
-                self.status = .disconnected
-            case .reasserting:
-                self.status = .connecting
-            @unknown default:
-                self.status = .disconnected
-            }
+            self.updateStatus()
+        }
+    }
+
+    private func updateStatus() {
+        guard let connection = tunnelManager?.connection else {
+            status = .disconnected
+            return
+        }
+        switch connection.status {
+        case .disconnected:
+            status = .disconnected
+        case .connecting:
+            status = .connecting
+        case .connected:
+            status = .connected
+            lastError = nil
+        case .disconnecting:
+            status = .disconnecting
+        case .invalid:
+            status = .disconnected
+        case .reasserting:
+            status = .connecting
+        @unknown default:
+            status = .disconnected
         }
     }
 
@@ -91,21 +108,17 @@ class VPNManager: ObservableObject {
         let config = NETunnelProviderProtocol()
         config.providerBundleIdentifier = Constants.packetTunnelBundleId
         config.serverAddress = "CraftLink VPN"
-        // 显式桥接为 NSObject 子类，避免 NETunnelProviderProtocol 序列化崩溃
         config.providerConfiguration = [
             "inviteCode": inviteCode as NSString,
             "port": (port ?? "") as NSString,
             "isServer": NSNumber(value: isServer)
         ]
 
-        // 修复 permission denied：
-        // 1) 先 loadFromPreferences 拉取已存在的 VPN 配置
-        // 2) 写入新配置并 saveToPreferences
-        // 3) saveToPreferences 成功后必须再 loadFromPreferences 一次，
-        //    让系统真正落盘、授予权限并使 isEnabled 生效
-        // 4) 确认 connection 是 NETunnelProviderSession 后再 startTunnel
-        //    若用户从未授权 VPN，提示其到系统设置开启，避免直接 permission denied
-        vpnManager.loadFromPreferences { [weak self] error in
+        // 获取或创建 tunnelManager，然后配置并启动
+        let manager = tunnelManager ?? NETunnelProviderManager()
+        tunnelManager = manager
+
+        manager.loadFromPreferences { [weak self] error in
             guard let self = self else { return }
             if let error = error {
                 DispatchQueue.main.async {
@@ -115,11 +128,11 @@ class VPNManager: ObservableObject {
                 return
             }
 
-            self.vpnManager.protocolConfiguration = config
-            self.vpnManager.localizedDescription = "CraftLink"
-            self.vpnManager.isEnabled = true
+            manager.protocolConfiguration = config
+            manager.localizedDescription = "CraftLink"
+            manager.isEnabled = true
 
-            self.vpnManager.saveToPreferences { saveError in
+            manager.saveToPreferences { saveError in
                 if let saveError = saveError {
                     DispatchQueue.main.async {
                         self.lastError = saveError.localizedDescription
@@ -128,8 +141,8 @@ class VPNManager: ObservableObject {
                     return
                 }
 
-                // 关键：重新加载，让权限和配置真正生效后再启动
-                self.vpnManager.loadFromPreferences { loadError in
+                // 重新加载，让权限和配置真正生效后再启动
+                manager.loadFromPreferences { loadError in
                     if let loadError = loadError {
                         DispatchQueue.main.async {
                             self.lastError = loadError.localizedDescription
@@ -138,8 +151,7 @@ class VPNManager: ObservableObject {
                         return
                     }
 
-                    // 若 isEnabled 仍为 false，说明用户在系统设置里关闭了 VPN 权限
-                    guard self.vpnManager.isEnabled else {
+                    guard manager.isEnabled else {
                         let err = NSError(
                             domain: "CraftLink",
                             code: -10,
@@ -152,7 +164,7 @@ class VPNManager: ObservableObject {
                         return
                     }
 
-                    guard let session = self.vpnManager.connection as? NETunnelProviderSession else {
+                    guard let session = manager.connection as? NETunnelProviderSession else {
                         let err = NSError(
                             domain: "CraftLink",
                             code: -11,
@@ -171,7 +183,6 @@ class VPNManager: ObservableObject {
                             completion(nil)
                         }
                     } catch {
-                        // 处理 NEVPNError.configurationReadWriteFailed / configurationStale 等
                         let message: String
                         if let neError = error as? NEVPNError {
                             switch neError.code {
@@ -179,8 +190,7 @@ class VPNManager: ObservableObject {
                                 message = "VPN 配置读写失败，请检查 VPN 权限后重试"
                             case .configurationStale:
                                 message = "VPN 配置已过期，正在重新加载..."
-                                // 配置过期：重新 load 一次再尝试
-                                self.vpnManager.loadFromPreferences { _ in
+                                manager.loadFromPreferences { _ in
                                     do {
                                         try session.startTunnel(options: nil)
                                         DispatchQueue.main.async { completion(nil) }
@@ -211,7 +221,7 @@ class VPNManager: ObservableObject {
     }
 
     func stopVPN() {
-        vpnManager.connection.stopVPNTunnel()
+        tunnelManager?.connection.stopVPNTunnel()
 
         currentInviteCode = nil
         currentPort = nil

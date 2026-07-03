@@ -5,8 +5,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     private let log = OSLog(subsystem: "com.craftlink", category: "PacketTunnel")
 
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
-        // 原因 3 修复：日志写入 App Group 共享容器，而非 NE extension 的临时目录
-        // extension 进程对共享容器确定有读写权限，避免 Rust 侧因路径权限返回 permission denied
+        // 日志写入 App Group 共享容器，避免 Rust 侧因路径权限返回 permission denied
         let logPath: String
         if let groupURL = FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: Constants.appGroupId) {
@@ -17,7 +16,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             )
             logPath = logDir.appendingPathComponent("easytier.log").path
         } else {
-            // 兜底：extension 容器的临时目录，确保 logPath 一定有值
             logPath = FileManager.default.temporaryDirectory
                 .appendingPathComponent("easytier.log").path
         }
@@ -41,35 +39,6 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         os_log("Starting tunnel: isServer=%{public}d, network=%{public}@, port=%{public}@",
                log: log, type: .info, isServer, networkName, port)
 
-        // 原因 1 修复：iOS 沙盒下 NEPacketTunnelProvider 绑定固定 UDP 端口
-        // 在部分 iOS 版本会返回 EACCES / permission denied；
-        // 且多个房主同网络会冲突。统一改为 listen_port=0 让系统随机分配，
-        // 节点间通过公共发现服务器 + network_name 协调，无需固定端口。
-        let tomlConfig = """
-            instance_name = "craftlink"
-            network_name = "\(networkName)"
-            shared_key = "\(networkName)"
-            listen_port = 0
-            peers = [
-              "tcp://public.easytier.cn:11010",
-              "udp://public.easytier.cn:11010"
-            ]
-            enable_ipv6 = false
-            [tun]
-            name = "utun"
-            mtu = 1300
-            """
-
-        var cfgErrMsg: UnsafePointer<CChar>? = nil
-        let runRet = rust_run_network_instance(tomlConfig, &cfgErrMsg)
-        if runRet != 0, let msg = cfgErrMsg {
-            let errorMsg = String(cString: msg)
-            rust_free_string(msg)
-            completionHandler(NSError(domain: "CraftLink", code: -2,
-                                      userInfo: [NSLocalizedDescriptionKey: "网络实例启动失败: \(errorMsg)"]))
-            return
-        }
-
         let localIP = isServer ? Constants.serverIP : Constants.clientIP
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: Constants.serverIP)
 
@@ -81,36 +50,72 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let dns = NEDNSSettings(servers: ["223.5.5.5", "8.8.8.8"])
         settings.dnsSettings = dns
 
+        // 关键修复：按 EasyTier 官方 iOS 示例的顺序执行
+        // 1) 先 setTunnelNetworkSettings（系统创建 TUN）
+        // 2) 从 packetFlow 获取 TUN fd
+        // 3) 再 run_network_instance（此时不创建自己的 TUN）
+        // 4) set_tun_fd 传入 fd
+        // 原代码顺序反了：先 run_network_instance（含 [tun] 配置→EasyTier 自己
+        // 尝试创建 TUN→iOS 沙盒拒绝→permission denied），这就是真因。
         setTunnelNetworkSettings(settings) { [weak self] error in
             guard let self = self else { return }
             if let error = error {
+                os_log("setTunnelNetworkSettings failed: %{public}@", log: self.log, type: .error, error.localizedDescription)
                 completionHandler(error)
                 return
             }
 
-            // 原因 2 修复：socketFileDescriptor 是 NEPacketTunnelFlow 的私有属性，
-            // KVC 在签名 IPA 上经常返回 nil 或抛异常。
-            // 1) 用 try/catch 包裹 KVC，避免私有属性访问抛出 NSUndefinedKeyException 直接崩溃
-            // 2) 失败时不再静默继续，必须回传错误，否则 EasyTier 内部拿不到 TUN fd
-            //    会以 permission denied 形式冒出来
+            // 用 keyPath "socket.fileDescriptor" 获取 TUN fd（EasyTier 官方用法）
+            // 原代码用 value(forKey: "socketFileDescriptor") 是错的 key 名
             var fd: Int32 = -1
-            if let raw = try? self.packetFlow.value(forKey: "socketFileDescriptor") as? NSNumber {
+            if let raw = try? self.packetFlow.value(forKeyPath: "socket.fileDescriptor") as? NSNumber {
+                fd = raw.int32Value
+            }
+            // 兼容旧版 iOS 的 fallback key
+            if fd < 0, let raw = try? self.packetFlow.value(forKey: "socketFileDescriptor") as? NSNumber {
                 fd = raw.int32Value
             }
 
+            os_log("TUN fd obtained: %{public}d", log: self.log, type: .info, fd)
+
             if fd < 0 {
-                os_log("Failed to obtain socketFileDescriptor from packetFlow (private KVC unavailable)",
-                       log: self.log, type: .error)
-                _ = rust_stop_network_instance()
+                os_log("Failed to obtain TUN fd from packetFlow", log: self.log, type: .error)
                 completionHandler(NSError(
                     domain: "CraftLink",
                     code: -3,
                     userInfo: [NSLocalizedDescriptionKey:
-                        "TUN 文件描述符获取失败：iOS 沙盒拒绝访问 packetFlow 私有属性。请确认使用 TrollStore/越狱环境安装，或更新到支持 PacketFlow 公开 API 的版本。"]
+                        "TUN 文件描述符获取失败：iOS 沙盒拒绝访问 packetFlow 私有属性。请确认使用 TrollStore/越狱环境安装。"]
                 ))
                 return
             }
 
+            // 启动 EasyTier 网络实例
+            // 注意：配置里不放 [tun]，避免 EasyTier 尝试自己创建 TUN 设备
+            // TUN fd 由下面的 set_tun_fd 从系统 packetFlow 传入
+            let tomlConfig = """
+                instance_name = "craftlink"
+                network_name = "\(networkName)"
+                shared_key = "\(networkName)"
+                listen_port = 0
+                peers = [
+                  "tcp://public.easytier.cn:11010",
+                  "udp://public.easytier.cn:11010"
+                ]
+                enable_ipv6 = false
+                """
+
+            var cfgErrMsg: UnsafePointer<CChar>? = nil
+            let runRet = rust_run_network_instance(tomlConfig, &cfgErrMsg)
+            if runRet != 0, let msg = cfgErrMsg {
+                let errorMsg = String(cString: msg)
+                rust_free_string(msg)
+                os_log("run_network_instance failed: %{public}@", log: self.log, type: .error, errorMsg)
+                completionHandler(NSError(domain: "CraftLink", code: -2,
+                                          userInfo: [NSLocalizedDescriptionKey: "网络实例启动失败: \(errorMsg)"]))
+                return
+            }
+
+            // 传入系统 TUN fd 给 EasyTier
             var fdErrMsg: UnsafePointer<CChar>? = nil
             let fdRet = rust_set_tun_fd(fd, &fdErrMsg)
             if fdRet != 0, let msg = fdErrMsg {
