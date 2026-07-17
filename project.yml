@@ -5,6 +5,13 @@ options:
     iOS: 15.0
   xcodeVersion: "15.0"
   minimumXcodeGenVersion: 2.30.0
+
+# 新版 CraftLink 是单 target App：
+#   - 不再有 PacketTunnel app-extension target（删除了 NEPacketTunnelProvider）。
+#   - 不再需要 NE 权限 / App Group。
+#   - Terracotta Rust 静态库 (`libterracotta.a`) 直接链接进主 App，通过
+#     `terracotta_ios_*` C ABI 调用（见 Natives/terracotta/terracotta.h）。
+
 targets:
   CraftLink:
     type: application
@@ -15,8 +22,13 @@ targets:
       - path: Services
       - path: Models
       - path: Utils
-      - path: ViewModels
-      - path: Core
+      # ViewModels 目录已删除（旧 VPNViewModel.swift 是空占位）。
+      # Core 目录也删除了（Scaffolding / MinecraftLANDiscovery / VirtualIPAllocator
+      # 全部由 Terracotta Rust 侧负责）。
+      - path: Natives
+        # 只把头文件加入编译，C 源本身不存在；bridging header 由下面 setting 指定。
+        excludes:
+          - "**/*.h"
       - path: Info.plist
       - path: CraftLink.entitlements
     entitlements:
@@ -31,22 +43,17 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app
-    dependencies:
-      - target: PacketTunnel
-  PacketTunnel:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: PacketTunnel
-      - path: Services/Constants.swift
-      - path: Services/RustBridge.swift
-    entitlements:
-      path: PacketTunnel/PacketTunnel.entitlements
-    info:
-      path: PacketTunnel/Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.craftlink.app.packet-tunnel
-        SKIP_INSTALL: YES
+        # Bridging header：让 Swift 能调用 terracotta.h 里的 C 函数。
+        SWIFT_OBJC_BRIDGING_HEADER: Natives/CraftLink-Bridging-Header.h
+        # 头文件搜索路径：让 bridging header 能 #include "terracotta/terracotta.h"。
+        HEADER_SEARCH_PATHS: $(PROJECT_DIR)/Natives
+        # 静态库搜索路径：libterracotta.a 应放在 RustLib/ 目录下（用户构建后放入）。
         LIBRARY_SEARCH_PATHS: $(PROJECT_DIR)/RustLib
-        OTHER_LDFLAGS: -all_load -leasytier_ios -framework NetworkExtension -framework SystemConfiguration -framework CoreFoundation -framework IOKit -framework Security -framework Network
+        # 链接 libterracotta.a：
+        # -force_load 确保 Rust 静态库的所有符号（含 lazy_static / OnceCell 构造）
+        # 都被链接进来，避免 `terracotta_ios_*` 被 dead-strip。
+        # 框架清单：
+        #   AVFoundation / AudioToolbox — SilentAudioPlayer 的 AVAudioPlayer
+        #   SystemConfiguration / Security / Network — EasyTier 网络栈
+        #   CoreFoundation / IOKit — Rust FFI 可能用到的系统调用
+        OTHER_LDFLAGS: -force_load $(PROJECT_DIR)/RustLib/libterracotta.a -framework AVFoundation -framework AudioToolbox -framework CoreFoundation -framework SystemConfiguration -framework IOKit -framework Security -framework Network

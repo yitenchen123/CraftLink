@@ -1,0 +1,3 @@
+# 此目录用于存放 libterracotta.a（burningtnt/Terracotta 的 iOS 构建）。
+# 用户按 README.md 步骤编译后，把 libterracotta.a 放到这里。
+# 文件本身不入 git（太大），由 .gitignore 排除。

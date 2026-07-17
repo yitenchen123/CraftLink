@@ -61,5 +61,13 @@ fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 
-# CraftLink specific: temporary directory for downloaded Rust static library
-RustLib/
+# CraftLink specific
+# RustLib/ 存放 libterracotta.a（用户构建后放入）。库本身不入 git，但保留目录占位。
+RustLib/*.a
+RustLib/*.xcframework
+
+# xcodegen 生成的 Xcode 工程
+CraftLink.xcodeproj/
+
+# 静音音频临时文件
+craftlink_silent.wav

@@ -1,5 +1,11 @@
 name: Build CraftLink IPA (unsigned)
 
+# 新版 CraftLink 单 target，无 PacketTunnel 扩展，无 NE 权限。
+# 只需链接 libterracotta.a（burningtnt/Terracotta 的 iOS 构建，含 lib_ios.rs 补丁）。
+#
+# 用户首次构建前需自行编译 libterracotta.a 并上传到 Release，然后修改下面的 URL。
+# 构建方法见 README.md / scripts/build_ios.sh（在 Amethyst-Terracotta-iOS 仓库里）。
+
 on:
   push:
     tags:
@@ -17,87 +23,43 @@ jobs:
           brew install xcodegen
           brew install ldid
 
-      - name: Download static library
+      - name: Download Terracotta static library
         run: |
           mkdir -p RustLib
-          curl -L -o RustLib/libeasytier_ios.a "https://github.com/yitenchen123/CraftLink/releases/download/v1.0.0-lib/libeasytier_ios.a"
+          # 占位 URL — 用户构建 libterracotta.a 后上传到自己的 Release 并替换此 URL。
+          # 构建步骤见 README.md「构建 libterracotta.a」一节。
+          curl -L --fail -o RustLib/libterracotta.a \
+            "https://github.com/yitenchen123/CraftLink/releases/download/v2.0.0-lib/libterracotta.a" \
+            || {
+              echo "❌ libterracotta.a 下载失败。"
+              echo "请先按 README.md 步骤编译 libterracotta.a 并上传到 Release，"
+              echo "然后修改 .github/workflows/build.yml 中的 URL。"
+              exit 1
+            }
           ls -la RustLib/
 
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Restore entitlements and PacketTunnel Info.plist (xcodegen generate 会清空这些文件)
+      - name: Normalize entitlements (xcodegen 会重写 .entitlements 文件)
         run: |
-          # 真因 1：xcodegen generate 会把 .entitlements 文件重写成空 <dict/>，
-          #         导致 ldid 嵌入空权限，TrollStore 安装后 permission denied。
-          # 真因 2：xcodegen generate 会重写 PacketTunnel/Info.plist，丢失
-          #         NSExtension 字段。iOS 找不到 NSExtensionPointIdentifier，
-          #         不认为这是合法的 Packet Tunnel extension，显示"需要更新"并拒绝启动。
-          # 修复：在 generate 之后、xcodebuild 之前，用 python 重新写回完整内容。
+          # xcodegen generate 会把 .entitlements 重写成空 <dict/>，
+          # 在 TrollStore 安装时可能导致权限问题。这里用 python 写回正确内容。
+          # 新版 CraftLink 不需要 NE 权限，entitlements 几乎为空。
           python3 - <<'PYEOF'
-          # 1. 恢复 entitlements 文件
           ent_content = '''<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>com.apple.developer.networking.networkextension</key>
-              <array>
-                  <string>packet-tunnel-provider</string>
-              </array>
-              <key>com.apple.security.application-groups</key>
-              <array>
-                  <string>group.com.craftlink</string>
-              </array>
           </dict>
           </plist>
           '''
           ent_lines = [line.strip() if line.strip() else line for line in ent_content.split('\n')]
           ent_cleaned = '\n'.join(ent_lines) + '\n'
-          for path in ['CraftLink.entitlements', 'PacketTunnel/PacketTunnel.entitlements']:
-              with open(path, 'w') as f:
-                  f.write(ent_cleaned)
-              print(f"=== {path} ===")
-              print(ent_cleaned)
-
-          # 2. 恢复 PacketTunnel/Info.plist（必须包含 NSExtension 字段）
-          info_content = '''<?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>$(DEVELOPMENT_LANGUAGE)</string>
-              <key>CFBundleDisplayName</key>
-              <string>CraftLink VPN</string>
-              <key>CFBundleExecutable</key>
-              <string>$(EXECUTABLE_NAME)</string>
-              <key>CFBundleIdentifier</key>
-              <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
-              <key>CFBundleName</key>
-              <string>$(PRODUCT_NAME)</string>
-              <key>CFBundlePackageType</key>
-              <string>XPC!</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>NSExtension</key>
-              <dict>
-                  <key>NSExtensionPointIdentifier</key>
-                  <string>com.apple.networkextension.packet-tunnel</string>
-                  <key>NSExtensionPrincipalClass</key>
-                  <string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string>
-              </dict>
-          </dict>
-          </plist>
-          '''
-          info_lines = [line.strip() if line.strip() else line for line in info_content.split('\n')]
-          info_cleaned = '\n'.join(info_lines) + '\n'
-          with open('PacketTunnel/Info.plist', 'w') as f:
-              f.write(info_cleaned)
-          print("=== PacketTunnel/Info.plist ===")
-          print(info_cleaned)
+          with open('CraftLink.entitlements', 'w') as f:
+              f.write(ent_cleaned)
+          print("=== CraftLink.entitlements ===")
+          print(ent_cleaned)
           PYEOF
 
       - name: Build unsigned .app
@@ -113,67 +75,27 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -derivedDataPath build/derivedData
 
-      - name: Embed entitlements into binaries
+      - name: Ad-hoc sign binary with entitlements (TrollStore 兼容)
         run: |
           APP_PATH=$(find build/derivedData/Build/Products/Release-iphoneos -name "*.app" | head -n1)
           echo "App path: $APP_PATH"
-          APPEX_PATH="$APP_PATH/PlugIns/PacketTunnel.appex"
-          if [ ! -d "$APPEX_PATH" ]; then
-            echo "❌ ERROR: PacketTunnel.appex not found at $APPEX_PATH"
-            find "$APP_PATH" -maxdepth 3 -type d
-            exit 1
-          fi
 
-          # 用 plutil 规范化 entitlements 文件，去除 BOM/CR LF/注释等潜在解析问题
+          # 规范化 entitlements 文件
           plutil -convert xml1 CraftLink.entitlements
-          plutil -convert xml1 PacketTunnel/PacketTunnel.entitlements
-          echo "=== CraftLink.entitlements (normalized) ==="
-          cat CraftLink.entitlements
-          echo "=== PacketTunnel.entitlements (normalized) ==="
-          cat PacketTunnel/PacketTunnel.entitlements
-          # 校验 plist 合法
           plutil -lint CraftLink.entitlements
-          plutil -lint PacketTunnel/PacketTunnel.entitlements
 
-          # 复制 entitlements 文件到对应包内
+          # 复制 entitlements 到包内
           cp CraftLink.entitlements "$APP_PATH/"
-          cp PacketTunnel/PacketTunnel.entitlements "$APPEX_PATH/"
 
-          # CODE_SIGNING_ALLOWED=NO 下二进制没有签名段，先 ad-hoc fakesign 再嵌权限
-          echo "Step 1: ad-hoc fakesign both binaries..."
+          # CODE_SIGNING_ALLOWED=NO 下二进制无签名段，先 ad-hoc fakesign 再嵌权限
+          echo "Step 1: ad-hoc fakesign binary..."
           ldid -S "$APP_PATH/CraftLink"
-          ldid -S "$APPEX_PATH/PacketTunnel"
 
-          echo "Step 2: embed entitlements into signed binaries..."
+          echo "Step 2: embed entitlements into signed binary..."
           ldid -S"$APP_PATH/CraftLink.entitlements" "$APP_PATH/CraftLink"
-          ldid -S"$APPEX_PATH/PacketTunnel.entitlements" "$APPEX_PATH/PacketTunnel"
 
           echo "✅ Entitlements embedded. Verifying..."
-          echo "--- CraftLink entitlements ---"
-          ldid -e "$APP_PATH/CraftLink"
-          echo "--- PacketTunnel entitlements ---"
-          ldid -e "$APPEX_PATH/PacketTunnel"
-
-          # 强制校验：如果 entitlements 输出为空，构建失败
-          CRAFT_ENT=$(ldid -e "$APP_PATH/CraftLink" | grep -c "networkextension" || true)
-          TUNNEL_ENT=$(ldid -e "$APPEX_PATH/PacketTunnel" | grep -c "networkextension" || true)
-          echo "CraftLink networkextension count: $CRAFT_ENT"
-          echo "PacketTunnel networkextension count: $TUNNEL_ENT"
-          if [ "$CRAFT_ENT" -eq 0 ] || [ "$TUNNEL_ENT" -eq 0 ]; then
-            echo "❌ FATAL: entitlements not embedded in binary! ldid -e output empty."
-            exit 1
-          fi
-          echo "✅ Verified: networkextension entitlement present in both binaries."
-
-          # 校验 PacketTunnel.appex/Info.plist 包含 NSExtension 字段
-          # 这是 iOS 识别 Packet Tunnel extension 的关键，缺失会导致"需要更新"提示
-          echo "=== 校验 PacketTunnel.appex/Info.plist 的 NSExtension 字段 ==="
-          plutil -extract NSExtension xml1 "$APPEX_PATH/Info.plist" -o - || {
-            echo "❌ FATAL: PacketTunnel.appex/Info.plist 缺少 NSExtension 字段！"
-            echo 'iOS 无法识别这是 Packet Tunnel extension，会显示「需要更新」并拒绝启动。'
-            exit 1
-          }
-          echo "✅ NSExtension 字段存在。"
+          ldid -e "$APP_PATH/CraftLink" || echo "(empty entitlements — expected for non-NE app)"
 
       - name: Package IPA
         run: |

@@ -1,16 +1,24 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct CreateRoomView: View {
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var vpnManager: VPNManager
+    @EnvironmentObject var terracottaManager: TerracottaManager
     @StateObject private var historyStore = RoomHistoryStore.shared
 
-    @State private var inviteCode = ""
+    /// 用户输入的 MC 端口。仅用于 RoomHistory 记录与 UI 提示；Terracotta 自己会从
+    /// Minecraft 的「对局域网开放」多播里发现真实端口。
     @State private var port = "25565"
     @State private var isCopied = false
     @State private var isCreating = false
     @State private var showError = false
-    @State private var showSuccess = false
+
+    /// 当前房间邀请码（从 `terracottaManager.currentInviteCode` 同步过来）。
+    /// 在 Swift 侧不再自己生成邀请码，而是等 Terracotta Rust 侧生成（保证与
+    /// HMCL/FCL/ZL2 的算法 100% 一致）。
+    private var inviteCode: String? { terracottaManager.currentInviteCode }
 
     var body: some View {
         ZStack {
@@ -27,7 +35,7 @@ struct CreateRoomView: View {
                         .fontWeight(.bold)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Minecraft 端口")
+                        Text("Minecraft 端口（仅用于记录，Terracotta 会自动发现）")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         HStack {
@@ -40,28 +48,28 @@ struct CreateRoomView: View {
                     }
                     .padding(.horizontal)
 
-                    Text("请在 Minecraft 中点击「对局域网开放」，输入相同的端口号")
+                    Text("请在 Minecraft 中点击「对局域网开放」\nCraftLink 会自动扫描并生成邀请码")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
 
-                    if isCreating {
+                    if isCreating && inviteCode == nil {
                         VStack(spacing: 12) {
                             ProgressView()
                                 .scaleEffect(1.2)
-                            Text("正在启动 VPN...")
+                            Text("正在扫描 Minecraft 局域网广播...")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 20)
-                    } else if !inviteCode.isEmpty {
+                    } else if let code = inviteCode, !code.isEmpty {
                         VStack(spacing: 16) {
                             Text("邀请码")
                                 .font(.headline)
                                 .foregroundColor(.secondary)
 
-                            Text(inviteCode)
+                            Text(code)
                                 .font(.system(.title2, design: .monospaced))
                                 .fontWeight(.bold)
                                 .padding()
@@ -87,8 +95,8 @@ struct CreateRoomView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 8) {
-                                Label("虚拟 IP: \(Constants.serverIP)", systemImage: "network")
-                                Label("端口: \(port)", systemImage: "number")
+                                Label("房主虚拟 IP: \(Constants.serverIP)", systemImage: "network")
+                                Label("Scaffolding 端口: \(Constants.scaffoldingPort)", systemImage: "number")
                                 Label("角色: 房主", systemImage: "crown.fill")
                             }
                             .font(.subheadline)
@@ -101,73 +109,77 @@ struct CreateRoomView: View {
                         .padding(.horizontal)
                     }
 
-                    if vpnManager.status == .connected {
-                        // EasyTier 还在异步启动中：显示进度而非「已连接」
-                        if vpnManager.tunnelStage != "ready" {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                Text(vpnManager.stageDescription.isEmpty ? "正在启动虚拟网络..." : vpnManager.stageDescription)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding()
-                            .background(Color.orange.opacity(0.1))
-                            .cornerRadius(10)
-                        } else {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundColor(.green)
-                                Text("VPN 已连接，其他玩家可通过邀请码加入")
-                                    .font(.subheadline)
-                            }
-                            .padding()
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(10)
-                        }
-
-                        // 房间成员列表（由 ScaffoldingServer 维护）
-                        if !vpnManager.players.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("房间成员（\(vpnManager.players.count)）")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                ForEach(vpnManager.players) { player in
-                                    HStack(spacing: 10) {
-                                        Image(systemName: player.kind == .host ? "crown.fill" : "person.fill")
-                                            .foregroundColor(player.kind == .host ? .orange : .accentColor)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(player.name)
-                                                .font(.subheadline)
-                                            Text("\(player.vendor) · \(player.kind.rawValue)")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                    } else if let error = vpnManager.lastError {
+                    // 房间状态卡片
+                    if terracottaManager.status == .connecting {
                         HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
-                            Text(error)
-                                .font(.caption)
+                            ProgressView()
+                            Text(terracottaManager.stageDescription.isEmpty ? "正在启动虚拟网络..." : terracottaManager.stageDescription)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
                         .padding()
                         .background(Color.orange.opacity(0.1))
                         .cornerRadius(10)
+                        .padding(.horizontal)
+                    } else if terracottaManager.status == .connected {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(.green)
+                            Text("房间已就绪，其他玩家可通过邀请码加入")
+                                .font(.subheadline)
+                        }
+                        .padding()
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(10)
+                        .padding(.horizontal)
+                    } else if terracottaManager.status == .error {
+                        if let error = terracottaManager.lastError {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text(error)
+                                    .font(.caption)
+                            }
+                            .padding()
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(10)
+                            .padding(.horizontal)
+                        }
+                    }
+
+                    // 房间成员列表（由 Terracotta Rust 侧通过 Scaffolding 协议同步）
+                    if !terracottaManager.players.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("房间成员（\(terracottaManager.players.count)）")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            ForEach(terracottaManager.players) { player in
+                                HStack(spacing: 10) {
+                                    Image(systemName: player.kind == "HOST" ? "crown.fill" : "person.fill")
+                                        .foregroundColor(player.kind == "HOST" ? .orange : .accentColor)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(player.name)
+                                            .font(.subheadline)
+                                        Text("\(player.vendor) · \(player.kind)")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
                     }
 
                     Spacer(minLength: 40)
 
                     Button("关闭房间", role: .destructive) {
-                        vpnManager.stopVPN()
+                        terracottaManager.stopVPN()
                         dismiss()
                     }
                     .padding()
@@ -182,7 +194,25 @@ struct CreateRoomView: View {
         .onAppear {
             startRoom()
         }
-        .onReceive(vpnManager.$lastError) { error in
+        .onChange(of: terracottaManager.currentInviteCode) { newCode in
+            // Terracotta 生成邀请码后自动复制到剪贴板
+            if let code = newCode, !code.isEmpty {
+                UIPasteboard.general.string = code
+                isCopied = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    isCopied = false
+                }
+                // 写入历史记录
+                let history = RoomHistory(
+                    inviteCode: code,
+                    role: .host,
+                    port: port,
+                    virtualIP: Constants.serverIP
+                )
+                historyStore.add(history)
+            }
+        }
+        .onReceive(terracottaManager.$lastError) { error in
             if error != nil {
                 showError = true
             }
@@ -190,45 +220,35 @@ struct CreateRoomView: View {
         .alert("启动失败", isPresented: $showError, actions: {
             Button("确定", role: .cancel) { }
         }, message: {
-            Text(vpnManager.lastError ?? "未知错误")
-        })
-        .alert("创建成功", isPresented: $showSuccess, actions: {
-            Button("确定", role: .cancel) { }
-        }, message: {
-            Text("房间已创建，邀请码已复制到剪贴板。")
+            Text(terracottaManager.lastError ?? "未知错误")
         })
     }
 
     private func startRoom() {
         isCreating = true
-        inviteCode = InviteCodeService.generate()
-
-        UIPasteboard.general.string = inviteCode
-        isCopied = true
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isCopied = false
-        }
-
-        vpnManager.createRoom(inviteCode: inviteCode, port: port) { error in
+        // 不在 Swift 侧生成邀请码 — 让 Terracotta Rust 侧生成（保证与 HMCL/FCL/ZL2
+        // 的 base-34 + mod-7 校验算法完全一致）。
+        terracottaManager.createRoom(inviteCode: nil, port: port, playerName: nil) { error in
             isCreating = false
-            if error == nil {
-                showSuccess = true
-                let history = RoomHistory(
-                    inviteCode: inviteCode,
-                    role: .host,
-                    port: port,
-                    virtualIP: Constants.serverIP
-                )
-                historyStore.add(history)
+            if let error = error {
+                print("Terracotta createRoom error: \(error.localizedDescription)")
             } else {
-                print("VPN start error: \(error?.localizedDescription ?? "")")
+                // 真正的「创建成功」要等 currentInviteCode 出现，由 onChange 处理。
+                // 这里只是 Rust 侧已开始 scanning。
+                isCreating = true  // 保持 progress 显示，直到邀请码出现
+            }
+        }
+        // 在邀请码出现前，如果状态变成 connected 或 error，应关闭 isCreating
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if terracottaManager.status != .connecting {
+                isCreating = false
             }
         }
     }
 
     private func copyCode() {
-        UIPasteboard.general.string = inviteCode
+        guard let code = inviteCode else { return }
+        UIPasteboard.general.string = code
         isCopied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             isCopied = false

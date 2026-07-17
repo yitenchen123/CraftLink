@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var vpnManager: VPNManager
+    @EnvironmentObject var terracottaManager: TerracottaManager
     @StateObject private var historyStore = RoomHistoryStore.shared
 
     @State private var showClearConfirm = false
@@ -12,7 +12,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                Section("VPN 状态") {
+                Section("联机状态") {
                     HStack {
                         Text("状态")
                         Spacer()
@@ -20,12 +20,12 @@ struct SettingsView: View {
                             Circle()
                                 .fill(statusColor)
                                 .frame(width: 8, height: 8)
-                            Text(vpnManager.status.rawValue)
+                            Text(terracottaManager.status.rawValue)
                                 .foregroundColor(statusColor)
                         }
                     }
 
-                    if let code = vpnManager.currentInviteCode {
+                    if let code = terracottaManager.currentInviteCode {
                         HStack {
                             Text("当前房间")
                             Spacer()
@@ -35,7 +35,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    if let role = vpnManager.currentRole {
+                    if let role = terracottaManager.currentRole {
                         HStack {
                             Text("角色")
                             Spacer()
@@ -44,18 +44,39 @@ struct SettingsView: View {
                         }
                     }
 
-                    if let port = vpnManager.currentPort, !port.isEmpty {
+                    if let port = terracottaManager.currentPort, !port.isEmpty {
                         HStack {
-                            Text("端口")
+                            Text("MC 端口")
                             Spacer()
                             Text(port)
                                 .foregroundColor(.secondary)
                         }
                     }
 
-                    if vpnManager.status == .connected {
+                    if let url = terracottaManager.directConnectURL {
+                        HStack {
+                            Text("MC 直连地址")
+                            Spacer()
+                            Text(url)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.green)
+                        }
+                    }
+
+                    if !terracottaManager.stageDescription.isEmpty {
+                        HStack {
+                            Text("阶段")
+                            Spacer()
+                            Text(terracottaManager.stageDescription)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+
+                    if terracottaManager.status == .connected || terracottaManager.status == .connecting {
                         Button("断开连接", role: .destructive) {
-                            vpnManager.stopVPN()
+                            terracottaManager.stopVPN()
                         }
                     }
                 }
@@ -99,6 +120,23 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
 
+                    if let metadata = TerracottaBridge.metadata() {
+                        HStack {
+                            Text("Terracotta")
+                            Spacer()
+                            Text("v\(metadata.version)")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("EasyTier")
+                            Spacer()
+                            Text(metadata.easytierVersion)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
                     Link(destination: URL(string: "https://github.com/yitenchen123/CraftLink")!) {
                         HStack {
                             Text("GitHub 仓库")
@@ -108,9 +146,18 @@ struct SettingsView: View {
                         }
                     }
 
+                    Link(destination: URL(string: "https://github.com/burningtnt/Terracotta")!) {
+                        HStack {
+                            Text("Powered by Terracotta")
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
                     Link(destination: URL(string: "https://github.com/EasyTier/EasyTier")!) {
                         HStack {
-                            Text("Powered by EasyTier")
+                            Text("EasyTier 网络")
                             Spacer()
                             Image(systemName: "arrow.up.right.square")
                                 .foregroundColor(.secondary)
@@ -145,11 +192,11 @@ struct SettingsView: View {
     }
 
     private var statusColor: Color {
-        switch vpnManager.status {
+        switch terracottaManager.status {
         case .disconnected: return .gray
         case .connecting: return .orange
         case .connected: return .green
-        case .disconnecting: return .orange
+        case .error: return .red
         }
     }
 }

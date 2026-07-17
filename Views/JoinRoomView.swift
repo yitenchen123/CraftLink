@@ -1,13 +1,15 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct JoinRoomView: View {
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var vpnManager: VPNManager
+    @EnvironmentObject var terracottaManager: TerracottaManager
     @StateObject private var historyStore = RoomHistoryStore.shared
 
     @State private var inputCode = ""
     @State private var isValid = false
-    @State private var hostPortText = ""
     @State private var isConnecting = false
     @State private var showError = false
     @State private var prefillCode: String?
@@ -42,7 +44,8 @@ struct JoinRoomView: View {
                                     .stroke(isValid ? Color.green.opacity(0.5) : Color.gray.opacity(0.3), lineWidth: 1)
                             )
                             .onChange(of: inputCode) { newValue in
-                                isValid = InviteCodeService.isValid(newValue)
+                                // 用 Terracotta Rust 侧的校验函数（与 HMCL/FCL/ZL2 一致）
+                                isValid = TerracottaBridge.verifyRoomCode(newValue)
                             }
                     }
                     .padding(.horizontal)
@@ -51,21 +54,11 @@ struct JoinRoomView: View {
                         HStack {
                             Image(systemName: "exclamationmark.circle.fill")
                                 .foregroundColor(.orange)
-                            Text("邀请码格式不正确")
+                            Text("邀请码格式不正确（应为 U/NNNN-NNNN-SSSS-SSSS）")
                                 .font(.caption)
                         }
                         .padding(.horizontal)
                     }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("房主 MC 端口（可选，用于显示房间成员）")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        TextField("如 25565", text: $hostPortText)
-                            .keyboardType(.numberPad)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                    }
-                    .padding(.horizontal)
 
                     Button(action: joinRoom) {
                         HStack(spacing: 8) {
@@ -87,19 +80,18 @@ struct JoinRoomView: View {
                     .disabled(!isValid || isConnecting)
                     .padding(.horizontal)
 
-                    if vpnManager.status == .connected {
-                        // EasyTier 还在异步启动中：ScaffoldingClient 尚未连接房主，显示进度
-                        if vpnManager.tunnelStage != "ready" {
-                            VStack(spacing: 16) {
-                                ProgressView()
-                                    .scaleEffect(1.2)
-                                Text(vpnManager.stageDescription.isEmpty ? "正在启动虚拟网络..." : vpnManager.stageDescription)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.horizontal)
-                        } else {
+                    // 状态卡片
+                    if terracottaManager.status == .connecting {
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.2)
+                            Text(terracottaManager.stageDescription.isEmpty ? "正在连接房主..." : terracottaManager.stageDescription)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal)
+                    } else if terracottaManager.status == .connected {
                         VStack(spacing: 16) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
@@ -112,8 +104,8 @@ struct JoinRoomView: View {
                                 Label("房主虚拟 IP: \(Constants.serverIP)", systemImage: "network")
                                 Label("你的虚拟 IP: \(Constants.clientIP)", systemImage: "person.fill")
                                 Label("角色: 加入者", systemImage: "person.2.fill")
-                                if let mcPort = vpnManager.discoveredMCPort {
-                                    Label("房主 MC 端口: \(mcPort)", systemImage: "number")
+                                if let url = terracottaManager.directConnectURL {
+                                    Label("MC 直连地址: \(url)", systemImage: "link")
                                         .foregroundColor(.green)
                                 }
                             }
@@ -124,66 +116,68 @@ struct JoinRoomView: View {
                             .background(Color.green.opacity(0.1))
                             .cornerRadius(12)
 
-                            if let mcPort = vpnManager.discoveredMCPort {
-                                Text("在 Minecraft 多人游戏 → 直接连接 中输入：\(Constants.serverIP):\(mcPort)")
+                            if let url = terracottaManager.directConnectURL {
+                                Text("在 Minecraft 多人游戏 → 直接连接 中输入：\(url)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
                             } else {
-                                Text("已连接 VPN。如未填端口，请在 Minecraft 中尝试 \(Constants.serverIP):房主端口")
+                                Text("已连接，等待 port_forward 就绪...")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
                             }
-
-                            // 房间成员列表（由 ScaffoldingClient 同步）
-                            if !vpnManager.players.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("房间成员（\(vpnManager.players.count)）")
-                                        .font(.headline)
-                                        .foregroundColor(.secondary)
-                                    ForEach(vpnManager.players) { player in
-                                        HStack(spacing: 10) {
-                                            Image(systemName: player.kind == .host ? "crown.fill" : "person.fill")
-                                                .foregroundColor(player.kind == .host ? .orange : .accentColor)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(player.name)
-                                                    .font(.subheadline)
-                                                Text("\(player.vendor) · \(player.kind.rawValue)")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            Spacer()
-                                        }
-                                        .padding(.vertical, 4)
-                                    }
-                                }
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(12)
-                            }
                         }
                         .padding(.horizontal)
+                    } else if terracottaManager.status == .error {
+                        if let error = terracottaManager.lastError {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text(error)
+                                    .font(.caption)
+                            }
+                            .padding()
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(10)
+                            .padding(.horizontal)
                         }
-                    } else if let error = vpnManager.lastError {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
-                            Text(error)
-                                .font(.caption)
+                    }
+
+                    // 房间成员列表（由 Terracotta Rust 侧通过 Scaffolding 协议同步）
+                    if !terracottaManager.players.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("房间成员（\(terracottaManager.players.count)）")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            ForEach(terracottaManager.players) { player in
+                                HStack(spacing: 10) {
+                                    Image(systemName: player.kind == "HOST" ? "crown.fill" : "person.fill")
+                                        .foregroundColor(player.kind == "HOST" ? .orange : .accentColor)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(player.name)
+                                            .font(.subheadline)
+                                        Text("\(player.vendor) · \(player.kind)")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
                         }
                         .padding()
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
                         .padding(.horizontal)
                     }
 
                     Spacer(minLength: 40)
 
-                    if vpnManager.status == .connected {
+                    if terracottaManager.status == .connected || terracottaManager.status == .connecting {
                         Button("断开连接", role: .destructive) {
-                            vpnManager.stopVPN()
+                            terracottaManager.stopVPN()
                             dismiss()
                         }
                         .padding()
@@ -199,10 +193,10 @@ struct JoinRoomView: View {
         .onAppear {
             if let code = prefillCode {
                 inputCode = code
-                isValid = InviteCodeService.isValid(code)
+                isValid = TerracottaBridge.verifyRoomCode(code)
             }
         }
-        .onReceive(vpnManager.$lastError) { error in
+        .onReceive(terracottaManager.$lastError) { error in
             if error != nil {
                 showError = true
             }
@@ -210,19 +204,13 @@ struct JoinRoomView: View {
         .alert("连接失败", isPresented: $showError, actions: {
             Button("确定", role: .cancel) { }
         }, message: {
-            Text(vpnManager.lastError ?? "未知错误")
+            Text(terracottaManager.lastError ?? "未知错误")
         })
     }
 
     private func joinRoom() {
         isConnecting = true
-        // 解析房主端口（可选）。提供时启动 ScaffoldingClient 以同步房间成员与 MC 端口。
-        let hostPort: UInt16? = {
-            let trimmed = hostPortText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let p = UInt16(trimmed), p > 0 else { return nil }
-            return p
-        }()
-        vpnManager.joinRoom(inviteCode: inputCode, hostPort: hostPort) { error in
+        terracottaManager.joinRoom(inviteCode: inputCode, playerName: nil) { error in
             isConnecting = false
             if let error = error {
                 print("连接失败: \(error.localizedDescription)")

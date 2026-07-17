@@ -2,13 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>com.apple.developer.networking.networkextension</key>
-    <array>
-        <string>packet-tunnel-provider</string>
-    </array>
-    <key>com.apple.security.application-groups</key>
-    <array>
-        <string>group.com.craftlink</string>
-    </array>
+    <!--
+      新版 CraftLink 不再使用 NEPacketTunnelProvider / NetworkExtension。
+      Terracotta Rust 库以 `no_tun=true` + `port_forward` 模式跑 EasyTier，
+      只占用本地 loopback 端口（127.0.0.1），无需任何系统级网络权限。
+      
+      因此删除了 `com.apple.developer.networking.networkextension` 权限。
+      也删除了 App Group（不再需要主 App 与 PacketTunnel 扩展共享 UserDefaults）。
+    -->
+    <!-- 留空，未来如需 push 通知等可在此添加 -->
 </dict>
 </plist>

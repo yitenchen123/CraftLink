@@ -23,7 +23,7 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>CraftLink 需要访问本地网络以建立 Minecraft 联机 VPN 连接。</string>
+    <string>CraftLink 需要访问本地网络以发现 Minecraft 的「对局域网开放」广播并建立联机隧道。</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UILaunchScreen</key>
@@ -44,6 +44,16 @@
         <string>UIInterfaceOrientationPortraitUpsideDown</string>
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <!--
+      后台音频模式：用于「后台保活」。
+      CraftLink 在房间运行期间会循环播放一段近静音音频，让 iOS 允许 App 在后台
+      继续 EasyTier 虚拟网络与 port_forward。无此声明则 App 切到后台会被冻结，
+      联机立刻断开。详见 SilentAudioPlayer.swift。
+    -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
     </array>
 </dict>
 </plist>

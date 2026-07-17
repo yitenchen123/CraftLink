@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LobbyView: View {
-    @EnvironmentObject var vpnManager: VPNManager
+    @EnvironmentObject var terracottaManager: TerracottaManager
     @StateObject private var historyStore = RoomHistoryStore.shared
 
     @State private var showCreate = false
@@ -34,9 +34,9 @@ struct LobbyView: View {
                         Circle()
                             .fill(statusColor)
                             .frame(width: 10, height: 10)
-                        Text(vpnManager.status.rawValue)
+                        Text(terracottaManager.status.rawValue)
                             .font(.subheadline)
-                        if let role = vpnManager.currentRole {
+                        if let role = terracottaManager.currentRole {
                             Text("• \(role.rawValue)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -47,11 +47,13 @@ struct LobbyView: View {
                     .background(statusColor.opacity(0.1))
                     .cornerRadius(20)
 
-                    // 连接中显示 PacketTunnel 上报的具体阶段
-                    if !vpnManager.stageDescription.isEmpty {
-                        Text(vpnManager.stageDescription)
+                    // 连接中显示 Terracotta 上报的具体阶段
+                    if !terracottaManager.stageDescription.isEmpty {
+                        Text(terracottaManager.stageDescription)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
 
                     HStack(spacing: 20) {
@@ -81,6 +83,8 @@ struct LobbyView: View {
                             .cornerRadius(16)
                         }
                     }
+                    // 房间运行中不允许再开新房间
+                    .disabled(terracottaManager.status == .connecting || terracottaManager.status == .connected)
 
                     if let latest = historyStore.latest {
                         VStack(alignment: .leading, spacing: 12) {
@@ -169,11 +173,11 @@ struct LobbyView: View {
     }
 
     private var statusColor: Color {
-        switch vpnManager.status {
+        switch terracottaManager.status {
         case .disconnected: return .gray
         case .connecting: return .orange
         case .connected: return .green
-        case .disconnecting: return .orange
+        case .error: return .red
         }
     }
 }
