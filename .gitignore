@@ -62,8 +62,8 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # CraftLink specific
-# RustLib/ 存放 libterracotta.a（用户构建后放入）。库本身不入 git，但保留目录占位。
-RustLib/*.a
+# RustLib/libterracotta.a 已预编译并提交入 git，CI 直接使用（无需重新编译 Rust）。
+# 需要重新编译时手动触发 rebuild-lib.yml workflow，下载 artifact 后替换此文件并提交。
 RustLib/*.xcframework
 
 # xcodegen 生成的 Xcode 工程

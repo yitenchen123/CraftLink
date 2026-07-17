@@ -1,0 +1,111 @@
+name: Rebuild libterracotta.a
+
+# 手动触发的 workflow，用于重新编译 libterracotta.a。
+#
+# 触发场景（任一发生时手动跑一次）：
+#   - burningtnt/Terracotta 上游更新
+#   - burningtnt/EasyTier 上游更新
+#   - scripts/patch_terracotta_for_ios.py 或 rust/src/lib_ios.rs 变更
+#
+# 使用方法：
+#   1. GitHub Actions 页面 → "Rebuild libterracotta.a" → Run workflow
+#   2. 等待构建完成（约 10 分钟），下载 libterracotta artifact
+#   3. 解压，将 libterracotta.a 放到 RustLib/ 目录（替换旧文件）
+#   4. 提交并推送
+#
+# 默认 push 到 main 不会触发此 workflow，只触发 build.yml（用预编译的 .a 编 IPA）。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-lib:
+    name: Rebuild libterracotta.a
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout CraftLink（拿补丁脚本和 lib_ios.rs）
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly + iOS targets
+        run: |
+          # Terracotta 用 edition = "2024"，需要 nightly
+          rustup toolchain install nightly --profile minimal
+          rustup component add rust-src --toolchain nightly
+          rustup target add aarch64-apple-ios --toolchain nightly
+          rustup target add aarch64-apple-ios-sim --toolchain nightly
+          rustup default nightly
+          rustc --version
+          cargo --version
+
+      - name: Install protobuf (EasyTier build script 需要 protoc)
+        run: |
+          brew install protobuf
+          protoc --version
+
+      - name: Clone burningtnt/Terracotta + EasyTier
+        run: |
+          git clone --depth=1 https://github.com/burningtnt/Terracotta.git ../Terracotta
+          git clone --depth=1 -b main https://github.com/burningtnt/EasyTier.git ../EasyTier
+          echo "TERRACOTTA_SHA=$(cd ../Terracotta && git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "EasyTier SHA:   $(cd ../EasyTier && git rev-parse HEAD)"
+          echo "Terracotta SHA: ${TERRACOTTA_SHA}"
+
+      - name: Apply iOS patches
+        run: |
+          python3 scripts/patch_terracotta_for_ios.py ../Terracotta ../EasyTier
+          echo "=== 验证补丁 ==="
+          grep 'cfg(any(target_os = "android", target_os = "ios"))' ../Terracotta/src/lib.rs
+          grep 'target_os = "ios"' ../Terracotta/src/easytier/mod.rs
+          grep 'staticlib' ../Terracotta/Cargo.toml
+          grep 'target_os = "ios"' ../EasyTier/easytier/src/common/network.rs
+          ls ../Terracotta/src/lib_ios.rs
+
+      - name: Point easytier dep to local clone
+        run: |
+          # cargo 默认会从 git 重新拉 EasyTier，覆盖我们的补丁。
+          # 用 [patch] 段把 easytier git 依赖重定向到本地已打补丁的 clone。
+          # EasyTier 仓库根 Cargo.toml 是 virtual workspace（无 [package]），
+          # 真正的 easytier crate 在 easytier/ 子目录。
+          cat >> ../Terracotta/Cargo.toml <<'EOF'
+
+          [patch."https://github.com/burningtnt/EasyTier.git"]
+          easytier = { path = "../EasyTier/easytier" }
+          EOF
+          echo "=== Cargo.toml 末尾 ==="
+          tail -5 ../Terracotta/Cargo.toml
+
+      - name: Build libterracotta.a (device, aarch64-apple-ios)
+        env:
+          # 设 TERRACOTTA_VERSION 让 build.rs 把版本号嵌入二进制。
+          # 否则 fallback 到 "snapshot"，设置页会显示 "Terracotta: vsnapshot"。
+          TERRACOTTA_VERSION: terracotta-${{ env.TERRACOTTA_SHA }}
+        run: |
+          cd ../Terracotta
+          cargo +nightly build --lib --release --target aarch64-apple-ios
+          ls -la target/aarch64-apple-ios/release/libterracotta.a
+
+      - name: Build libterracotta.a (simulator, aarch64-apple-ios-sim)
+        continue-on-error: true
+        env:
+          TERRACOTTA_VERSION: terracotta-${{ env.TERRACOTTA_SHA }}
+        run: |
+          cd ../Terracotta
+          cargo +nightly build --lib --release --target aarch64-apple-ios-sim
+          ls -la target/aarch64-apple-ios-sim/release/libterracotta.a || echo "(simulator build failed — device slice is enough for TrollStore)"
+
+      - name: Stage artifact
+        run: |
+          mkdir -p libterracotta-out
+          cp ../Terracotta/target/aarch64-apple-ios/release/libterracotta.a libterracotta-out/libterracotta.a
+          if [[ -f ../Terracotta/target/aarch64-apple-ios-sim/release/libterracotta.a ]]; then
+            cp ../Terracotta/target/aarch64-apple-ios-sim/release/libterracotta.a libterracotta-out/libterracotta-sim.a
+          fi
+          ls -la libterracotta-out/
+
+      - name: Upload libterracotta.a
+        uses: actions/upload-artifact@v4
+        with:
+          name: libterracotta
+          path: libterracotta-out/
+          retention-days: 30
