@@ -91,6 +91,15 @@ jobs:
           file RustLib/libterracotta.a
           lipo -info RustLib/libterracotta.a || true
 
+      # 重建后上传 .a artifact，方便下载后提交到 RustLib/ 让后续构建回到快速模式
+      - name: Upload rebuilt libterracotta.a (if rebuilt)
+        if: steps.needrebuild.outputs.need == 'true' || github.event.inputs.rebuild_lib == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libterracotta-rebuilt
+          path: RustLib/libterracotta.a
+          retention-days: 14
+
       - name: Generate Xcode project
         run: xcodegen generate
 
