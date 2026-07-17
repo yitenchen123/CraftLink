@@ -167,6 +167,75 @@ pub extern "C" fn terracotta_ios_set_scanning(
     controller::set_scanning(room, player, vec![]);
 }
 
+/// Host: bypass multicast scanning and start hosting with an explicit MC port.
+///
+/// iOS 上多播接收（MinecraftScanner 监听 224.0.2.60:4445）受本地网络权限和
+/// TrollStore 签名影响，可能无法收到 PojavLauncher 里 MC 发的 LAN 广播。此函数
+/// 让用户手动输入 MC「对局域网开放」后显示的端口号，直接进入 HostStarting →
+/// start_host，完全跳过 MinecraftScanner。
+///
+/// 与 `terracotta_ios_set_scanning` 的区别：不创建 scanner、不进 HostScanning 状态，
+/// 直接进 HostStarting(room, port)，然后调 `scaffolding::start_host`。
+///
+/// `room`    - optional UTF-8 room code to reuse; pass null to generate one.
+/// `port`    - MC LAN port (e.g. 25565, or the random port MC shows).
+/// `player`  - optional player name; pass null for "Terracotta Anonymous Host".
+///
+/// Returns 1 on success, 0 if not in Waiting state.
+#[unsafe(no_mangle)]
+pub extern "C" fn terracotta_ios_start_host_with_port(
+    room: *const c_char,
+    port: u16,
+    player: *const c_char,
+) -> c_int {
+    use crate::controller::{AppState, AppStateCapture, scaffolding};
+    use crate::easytier::publics::fetch_public_nodes;
+    use std::sync::mpsc;
+
+    let room_str = cstr_to_option_string(room);
+    let player_str = cstr_to_option_string(player);
+
+    // 1. 获取状态锁，检查当前是 Waiting，否则拒绝
+    let capture: AppStateCapture = {
+        let state = AppState::acquire();
+        if !matches!(state.as_ref(), AppState::Waiting) {
+            terracotta_log("start_host_with_port: not in Waiting state, ignored.");
+            return 0;
+        }
+        // 2. 生成或复用 room code
+        let room_obj = match room_str.as_ref() {
+            Some(r) => Room::from(r).unwrap_or_else(Room::create),
+            None => Room::create(),
+        };
+        // 3. 直接进 HostStarting（跳过 HostScanning + MinecraftScanner）
+        state.set(AppState::HostStarting { room: room_obj, port })
+    };
+    terracotta_log(&format!(
+        "start_host_with_port: port={}, player={:?}, entering HostStarting.",
+        port, player_str
+    ));
+
+    // 4. spawn 线程：prefetch public nodes + 调 start_host
+    //    完全模仿 controller::set_scanning 的 spawn 块，只是跳过了 scanner 轮询。
+    thread::spawn(move || {
+        let room_obj = match room_str.as_ref() {
+            Some(r) => Room::from(r).unwrap_or_else(Room::create),
+            None => Room::create(),
+        };
+
+        let (sender, receiver) = mpsc::channel();
+        let room2 = room_obj.clone();
+        thread::spawn(move || {
+            let _ = sender.send(fetch_public_nodes(&room2, vec![]));
+        });
+
+        let public_servers = receiver.recv().unwrap_or_default();
+        scaffolding::start_host(room_obj, port, player_str, capture, public_servers);
+    });
+
+    1
+}
+
 /// Guest: join an existing room. Returns 1 if the join was initiated
 /// successfully, 0 if the room code is invalid or Terracotta is not in the
 /// Waiting state.

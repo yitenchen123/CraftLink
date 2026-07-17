@@ -8,16 +8,17 @@ struct CreateRoomView: View {
     @EnvironmentObject var terracottaManager: TerracottaManager
     @StateObject private var historyStore = RoomHistoryStore.shared
 
-    /// 用户输入的 MC 端口。仅用于 RoomHistory 记录与 UI 提示；Terracotta 自己会从
-    /// Minecraft 的「对局域网开放」多播里发现真实端口。
+    /// MC「对局域网开放」后显示的端口号。
+    /// 手动端口模式下，此端口会直接传给 Terracotta start_host（绕过多播扫描）。
     @State private var port = "25565"
     @State private var isCopied = false
     @State private var isCreating = false
     @State private var showError = false
 
+    /// 模式开关：true=手动输入端口（推荐，iOS 多播不可靠），false=自动扫描多播。
+    @State private var useManualPort = true
+
     /// 当前房间邀请码（从 `terracottaManager.currentInviteCode` 同步过来）。
-    /// 在 Swift 侧不再自己生成邀请码，而是等 Terracotta Rust 侧生成（保证与
-    /// HMCL/FCL/ZL2 的算法 100% 一致）。
     private var inviteCode: String? { terracottaManager.currentInviteCode }
 
     var body: some View {
@@ -34,8 +35,30 @@ struct CreateRoomView: View {
                         .font(.title2)
                         .fontWeight(.bold)
 
+                    // ---- 模式选择 ----
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle(isOn: $useManualPort) {
+                            Label("手动输入端口（推荐）", systemImage: "hand.tap")
+                                .font(.subheadline)
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: Color(hex: "D34C3B")))
+
+                        Text(useManualPort
+                             ? "在 MC 里点「对局域网开放」后会显示端口号（如 25565 或随机端口），把它填到下面。此模式不依赖多播，最可靠。"
+                             : "CraftLink 会自动扫描 MC 的局域网广播。iOS 上多播受本地网络权限影响，可能扫描不到。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+
+                    // ---- 端口输入 ----
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Minecraft 端口（仅用于记录，Terracotta 会自动发现）")
+                        Text(useManualPort
+                             ? "Minecraft 端口号"
+                             : "Minecraft 端口（仅用于记录，Terracotta 会自动发现）")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         HStack {
@@ -48,17 +71,39 @@ struct CreateRoomView: View {
                     }
                     .padding(.horizontal)
 
-                    Text("请在 Minecraft 中点击「对局域网开放」\nCraftLink 会自动扫描并生成邀请码")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                    if !useManualPort {
+                        Text("请在 Minecraft 中点击「对局域网开放」\nCraftLink 会自动扫描并生成邀请码")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
 
+                    // ---- 启动按钮（手动模式需要点按钮；自动模式也点按钮启动） ----
+                    if !isCreating && inviteCode == nil {
+                        Button(action: startRoom) {
+                            HStack(spacing: 8) {
+                                Image(systemName: useManualPort ? "play.fill" : "antenna.radiowaves.left.and.right")
+                                Text(useManualPort ? "创建房间" : "开始扫描")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(hex: "D34C3B"))
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal)
+                        .disabled(useManualPort && port.isEmpty)
+                    }
+
+                    // ---- 创建中：扫描/启动进度 ----
                     if isCreating && inviteCode == nil {
                         VStack(spacing: 12) {
                             ProgressView()
                                 .scaleEffect(1.2)
-                            Text("正在扫描 Minecraft 局域网广播...")
+                            Text(useManualPort
+                                 ? "正在生成邀请码并启动虚拟网络..."
+                                 : "正在扫描 Minecraft 局域网广播...")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -191,9 +236,6 @@ struct CreateRoomView: View {
                 .padding(.vertical)
             }
         }
-        .onAppear {
-            startRoom()
-        }
         .onChange(of: terracottaManager.currentInviteCode) { newCode in
             // Terracotta 生成邀请码后自动复制到剪贴板
             if let code = newCode, !code.isEmpty {
@@ -226,18 +268,35 @@ struct CreateRoomView: View {
 
     private func startRoom() {
         isCreating = true
-        // 不在 Swift 侧生成邀请码 — 让 Terracotta Rust 侧生成（保证与 HMCL/FCL/ZL2
-        // 的 base-34 + mod-7 校验算法完全一致）。
-        terracottaManager.createRoom(inviteCode: nil, port: port, playerName: nil) { error in
-            isCreating = false
-            if let error = error {
-                print("Terracotta createRoom error: \(error.localizedDescription)")
-            } else {
-                // 真正的「创建成功」要等 currentInviteCode 出现，由 onChange 处理。
-                // 这里只是 Rust 侧已开始 scanning。
-                isCreating = true  // 保持 progress 显示，直到邀请码出现
+
+        if useManualPort {
+            // 手动端口模式：直接用用户输入的端口启动 host，绕过多播扫描。
+            guard let portNum = UInt16(port), portNum > 0 else {
+                isCreating = false
+                terracottaManager.lastError = "端口号无效，请输入 MC 显示的端口号（如 25565）"
+                showError = true
+                return
+            }
+            terracottaManager.createRoomWithPort(inviteCode: nil, port: portNum, playerName: nil) { error in
+                isCreating = false
+                if let error = error {
+                    print("Terracotta createRoomWithPort error: \(error.localizedDescription)")
+                } else {
+                    isCreating = true  // 保持 progress 显示，直到邀请码出现
+                }
+            }
+        } else {
+            // 自动扫描模式：调 setScanning，Terracotta 自己从多播发现端口。
+            terracottaManager.createRoom(inviteCode: nil, port: port, playerName: nil) { error in
+                isCreating = false
+                if let error = error {
+                    print("Terracotta createRoom error: \(error.localizedDescription)")
+                } else {
+                    isCreating = true
+                }
             }
         }
+
         // 在邀请码出现前，如果状态变成 connected 或 error，应关闭 isCreating
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if terracottaManager.status != .connecting {

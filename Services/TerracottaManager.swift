@@ -133,6 +133,50 @@ final class TerracottaManager: ObservableObject {
         completion(nil)
     }
 
+    /// 房主（手动端口模式）：绕过多播扫描，用用户输入的 MC LAN 端口直接启动 host。
+    ///
+    /// 用于 iOS 多播接收不可靠的场景（TrollStore App 本地网络权限问题等）。
+    /// 用户在 PojavLauncher 的 MC 里「对局域网开放」后会看到端口号，直接输入即可。
+    /// - Parameters:
+    ///   - inviteCode: 可选，复用已有邀请码；nil 让 Rust 侧生成。
+    ///   - port: MC LAN 端口（MC 显示的端口号，如 25565）。
+    ///   - playerName: 玩家昵称，nil 用设备名。
+    ///   - completion: 调用后立即返回 nil（实际启动是异步的）。
+    func createRoomWithPort(inviteCode: String?, port: UInt16, playerName: String?, completion: @escaping (Error?) -> Void) {
+        guard initialized else {
+            completion(terracottaError("Terracotta 未初始化"))
+            return
+        }
+
+        // 重置上一次 session 残留
+        resetSessionState()
+
+        currentRole = .host
+        currentInviteCode = inviteCode
+        currentPort = String(port)
+        status = .connecting
+        stageDescription = "正在生成邀请码并启动虚拟网络..."
+        sessionActive = true
+
+        // 启动后台保活
+        SilentAudioPlayer.shared.startKeepingAlive()
+
+        // 调用 Rust：直接用指定端口启动 host（跳过 scanner）
+        let ok = TerracottaBridge.startHostWithPort(room: inviteCode, port: port, playerName: playerName)
+        if !ok {
+            let err = terracottaError("启动失败：Terracotta 不在 Waiting 状态")
+            lastError = err.localizedDescription
+            status = .error
+            sessionActive = false
+            SilentAudioPlayer.shared.stopKeepingAlive()
+            completion(err)
+            return
+        }
+
+        startPolling()
+        completion(nil)
+    }
+
     /// 访客：加入房间。
     /// - Parameters:
     ///   - inviteCode: 必填，房主分享的 Scaffolding 邀请码。

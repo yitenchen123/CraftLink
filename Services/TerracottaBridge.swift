@@ -34,6 +34,9 @@ func terracotta_ios_set_waiting()
 @_silgen_name("terracotta_ios_set_scanning")
 func terracotta_ios_set_scanning(_ room: UnsafePointer<CChar>?, _ player: UnsafePointer<CChar>?)
 
+@_silgen_name("terracotta_ios_start_host_with_port")
+func terracotta_ios_start_host_with_port(_ room: UnsafePointer<CChar>?, _ port: UInt16, _ player: UnsafePointer<CChar>?) -> CInt
+
 @_silgen_name("terracotta_ios_set_guesting")
 func terracotta_ios_set_guesting(_ room: UnsafePointer<CChar>?, _ player: UnsafePointer<CChar>?) -> CInt
 
@@ -164,6 +167,24 @@ enum TerracottaBridge {
         callWithOptionalCString(room) { roomCStr in
             callWithOptionalCString(playerName) { playerCStr in
                 terracotta_ios_set_scanning(roomCStr, playerCStr)
+            }
+        }
+    }
+
+    /// 房主（手动端口模式）：绕过多播扫描，直接用用户输入的 MC LAN 端口启动 host。
+    ///
+    /// iOS 上多播接收受本地网络权限和 TrollStore 签名影响，可能收不到 PojavLauncher
+    /// 里 MC 发的 LAN 广播。此方法让用户手动输入 MC「对局域网开放」后显示的端口号，
+    /// 完全跳过 MinecraftScanner，直接进入 start_host。
+    /// - Parameters:
+    ///   - room: 可选，复用已有邀请码；nil 则生成新的。
+    ///   - port: MC LAN 端口（MC 开 LAN 时显示的端口号，如 25565 或随机端口）。
+    ///   - playerName: 可选，玩家昵称；nil 用 "Terracotta Anonymous Host"。
+    /// - Returns: true 表示已开始启动；false 表示当前不在 Waiting 状态。
+    static func startHostWithPort(room: String?, port: UInt16, playerName: String?) -> Bool {
+        callWithOptionalCString(room) { roomCStr in
+            callWithOptionalCString(playerName) { playerCStr in
+                terracotta_ios_start_host_with_port(roomCStr, port, playerCStr) == 1
             }
         }
     }
