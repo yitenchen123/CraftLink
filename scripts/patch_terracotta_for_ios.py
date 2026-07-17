@@ -186,13 +186,14 @@ def patch_terracotta_easytier_mod_rs(path: Path) -> None:
 
 def patch_terracotta_cargo_toml(path: Path) -> None:
     """Cargo.toml: 让 easytier/toml/tokio/cidr 在 iOS 上也启用；
-    crate-type 加 staticlib（iOS 只支持 staticlib）。"""
+    crate-type 改为 staticlib（iOS 不需要 cdylib，且 cdylib 链接时会因
+    ___chkstk_darwin 未定义而失败）。"""
     log("Patching Terracotta Cargo.toml ...")
     def transform(old: str) -> str:
-        # 幂等检测：已有 iOS target 块且 staticlib，则跳过
+        # 幂等检测：已有 iOS target 块且 crate-type 只有 staticlib
         already_patched = (
             'cfg(any(target_os = "android", target_os = "ios"))' in old
-            and 'staticlib' in old
+            and 'crate-type = ["staticlib"]' in old
         )
         if already_patched:
             return None
@@ -223,13 +224,14 @@ def patch_terracotta_cargo_toml(path: Path) -> None:
         )
         if old_block in new:
             new = new.replace(old_block, new_block, 1)
-        # 2. crate-type: iOS 只支持 staticlib（cdylib 在 iOS 上不行）
-        if 'crate-type = ["cdylib"]' in new:
-            new = new.replace(
-                'crate-type = ["cdylib"]',
-                'crate-type = ["cdylib", "staticlib"]',
-                1,
-            )
+        # 2. crate-type: iOS 只用 staticlib。
+        #    cdylib 在 iOS 上链接时会因 ___chkstk_darwin 未定义而失败
+        #    （libclang_rt.ios.a 未被链接）。staticlib 不运行链接器，只归档 .o，
+        #    最终链接由 Xcode 在编译 IPA 时完成（会正确链接 runtime）。
+        if 'crate-type = ["cdylib", "staticlib"]' in new:
+            new = new.replace('crate-type = ["cdylib", "staticlib"]', 'crate-type = ["staticlib"]', 1)
+        elif 'crate-type = ["cdylib"]' in new:
+            new = new.replace('crate-type = ["cdylib"]', 'crate-type = ["staticlib"]', 1)
         return new
     patch_file(path, transform)
 
