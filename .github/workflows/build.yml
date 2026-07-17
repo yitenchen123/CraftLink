@@ -70,10 +70,12 @@ jobs:
         run: |
           # cargo 默认会从 git 重新拉 EasyTier，覆盖我们的补丁。
           # 用 [patch] 段把 easytier git 依赖重定向到本地已打补丁的 clone。
+          # 注意：EasyTier 仓库根 Cargo.toml 是 virtual workspace（无 [package]），
+          # 真正的 easytier crate 在 easytier/ 子目录，所以 path 要指到那里。
           cat >> ../Terracotta/Cargo.toml <<'EOF'
 
           [patch."https://github.com/burningtnt/EasyTier.git"]
-          easytier = { path = "../EasyTier" }
+          easytier = { path = "../EasyTier/easytier" }
           EOF
           echo "=== Cargo.toml 末尾 ==="
           tail -5 ../Terracotta/Cargo.toml
