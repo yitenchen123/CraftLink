@@ -119,14 +119,23 @@ jobs:
           mkdir -p "$HEADERS_DIR" "$OUTPUT_DIR"
           rm -rf "$OUTPUT_DIR/libterracotta.xcframework"
           printf '%s\n' '#ifndef TERRACOTTA_H' '#define TERRACOTTA_H' '#include <stdint.h>' '#ifdef __cplusplus' 'extern "C" {' '#endif' 'int terracotta_ios_start(const char *dir, int logging_fd);' 'char *terracotta_ios_get_state(void);' 'void terracotta_ios_set_waiting(void);' 'void terracotta_ios_set_scanning(const char *room, const char *player);' 'int terracotta_ios_start_host_with_port(const char *room, uint16_t port, const char *player);' 'int terracotta_ios_set_guesting(const char *room, const char *player);' 'int terracotta_ios_verify_room_code(const char *code);' 'char *terracotta_ios_get_metadata(void);' 'void terracotta_ios_free_string(char *ptr);' 'void terracotta_ios_panic(void);' '#ifdef __cplusplus' '}' '#endif' '#endif' > "$HEADERS_DIR/terracotta.h"
+          # xcodebuild 不允许在同一 xcframework 放两个 simulator slice（arm64-sim
+          # 和 x86_64-sim 被认为是等价平台，报 "represent two equivalent library
+          # definitions"）。用 lipo 合并成 fat binary 作为单一 simulator slice。
+          lipo -create \
+            /tmp/Terracotta/target/aarch64-apple-ios-sim/release/libterracotta.a \
+            /tmp/Terracotta/target/x86_64-apple-ios/release/libterracotta.a \
+            -output /tmp/Terracotta/libterracotta-sim-fat.a
+          echo "=== fat simulator .a 架构 ==="
+          lipo -info /tmp/Terracotta/libterracotta-sim-fat.a
           xcodebuild -create-xcframework \
             -library /tmp/Terracotta/target/aarch64-apple-ios/release/libterracotta.a -headers "$HEADERS_DIR" \
-            -library /tmp/Terracotta/target/aarch64-apple-ios-sim/release/libterracotta.a -headers "$HEADERS_DIR" \
-            -library /tmp/Terracotta/target/x86_64-apple-ios/release/libterracotta.a -headers "$HEADERS_DIR" \
+            -library /tmp/Terracotta/libterracotta-sim-fat.a -headers "$HEADERS_DIR" \
             -output "$OUTPUT_DIR/libterracotta.xcframework"
           ls -la "$OUTPUT_DIR/libterracotta.xcframework/"
           du -sh "$OUTPUT_DIR/libterracotta.xcframework"
           cp /tmp/Terracotta/target/aarch64-apple-ios/release/libterracotta.a "$OUTPUT_DIR/libterracotta-ios-arm64.a"
+          cp /tmp/Terracotta/libterracotta-sim-fat.a "$OUTPUT_DIR/libterracotta-ios-sim-fat.a"
 
       - name: Upload xcframework artifact
         uses: actions/upload-artifact@v4
@@ -135,6 +144,7 @@ jobs:
           path: |
             build/ios/libterracotta.xcframework
             build/ios/libterracotta-ios-arm64.a
+            build/ios/libterracotta-ios-sim-fat.a
           retention-days: 30
 
       - name: Summary
@@ -142,7 +152,7 @@ jobs:
           echo "## ✅ libterracotta.xcframework 构建完成" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Terracotta 版本**: v0.4.2 (\`${TERRACOTTA_SHA}\`)" >> $GITHUB_STEP_SUMMARY
-          echo "- **包含 slice**: ios-arm64 (device), ios-arm64-simulator, ios-x86_64-simulator" >> $GITHUB_STEP_SUMMARY
+          echo "- **包含 slice**: ios-arm64 (device) + ios-arm64_x86_64-simulator (fat)" >> $GITHUB_STEP_SUMMARY
           echo "- **手动端口模式**: ✅ \`terracotta_ios_start_host_with_port\`" >> $GITHUB_STEP_SUMMARY
           echo "- **NE 权限**: 不需要（no_tun + port_forward）" >> $GITHUB_STEP_SUMMARY
           echo "- **协议兼容**: 100% 与 HMCL/FCL/ZL2 v0.4.2 一致" >> $GITHUB_STEP_SUMMARY
