@@ -23,7 +23,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ---- Job 1: 编译 libterracotta.a ----
+  # ---- Job 1: 编译 libterracotta.a（带 cache）----
+  # 首次构建约 10 分钟。之后只要 Terracotta/EasyTier 上游 commit 和本地 patch
+  # 脚本没变，就命中 cache，跳过 Rust 编译，整个 job 约 30 秒。
   build-lib:
     name: Build libterracotta.a
     runs-on: macos-15
@@ -32,7 +34,38 @@ jobs:
       - name: Checkout CraftLink（拿补丁脚本和 lib_ios.rs）
         uses: actions/checkout@v4
 
+      - name: Clone burningtnt/Terracotta + EasyTier
+        # 即使 cache hit 也要 clone，因为要拿 commit hash 算 cache key。
+        # --depth=1 只拉最新 commit，约 30 秒。
+        run: |
+          git clone --depth=1 https://github.com/burningtnt/Terracotta.git ../Terracotta
+          git clone --depth=1 -b main https://github.com/burningtnt/EasyTier.git ../EasyTier
+          echo "TERRACOTTA_SHA=$(cd ../Terracotta && git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "EASYTIER_SHA=$(cd ../EasyTier && git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "Terracotta: ${TERRACOTTA_SHA:0:12}"
+          echo "EasyTier:   ${EASYTIER_SHA:0:12}"
+
+      - name: Compute cache key
+        # cache key = Terracotta commit + EasyTier commit + patch 脚本内容 hash
+        # 任何一个变了就重新编译。
+        id: key
+        run: |
+          PATCH_HASH=$(cat scripts/patch_terracotta_for_ios.py rust/src/lib_ios.rs | shasum -a 256 | cut -d' ' -f1)
+          KEY="libterracotta-${TERRACOTTA_SHA:0:12}-${EASYTIER_SHA:0:12}-${PATCH_HASH:0:12}"
+          echo "key=$KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $KEY"
+
+      - name: Restore libterracotta.a cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: libterracotta-out/
+          key: ${{ steps.key.outputs.key }}
+
+      # ===== 以下步骤仅在 cache miss 时执行 =====
+
       - name: Install Rust nightly + iOS targets
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           # Terracotta 用 edition = "2024"，需要 nightly
           rustup toolchain install nightly --profile minimal
@@ -45,23 +78,13 @@ jobs:
           cargo --version
 
       - name: Install protobuf (EasyTier build script 需要 protoc)
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           brew install protobuf
           protoc --version
 
-      - name: Clone burningtnt/Terracotta
-        run: |
-          git clone https://github.com/burningtnt/Terracotta.git ../Terracotta
-          cd ../Terracotta
-          git log --oneline -1
-
-      - name: Clone burningtnt/EasyTier (fork)
-        run: |
-          git clone -b main https://github.com/burningtnt/EasyTier.git ../EasyTier
-          cd ../EasyTier
-          git log --oneline -1
-
       - name: Apply iOS patches
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           python3 scripts/patch_terracotta_for_ios.py ../Terracotta ../EasyTier
           echo "=== 验证补丁 ==="
@@ -72,6 +95,7 @@ jobs:
           ls ../Terracotta/src/lib_ios.rs
 
       - name: Point easytier dep to local clone
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           # cargo 默认会从 git 重新拉 EasyTier，覆盖我们的补丁。
           # 用 [patch] 段把 easytier git 依赖重定向到本地已打补丁的 clone。
@@ -86,19 +110,29 @@ jobs:
           tail -5 ../Terracotta/Cargo.toml
 
       - name: Build libterracotta.a (device, aarch64-apple-ios)
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          # 设 TERRACOTTA_VERSION 环境变量，让 build.rs 把版本号嵌入二进制。
+          # 否则 build.rs fallback 到 "snapshot"，设置页会显示 "Terracotta: vsnapshot"。
+          # 用 Terracotta 的 short sha 让版本可追溯到具体 commit。
+          TERRACOTTA_VERSION: terracotta-${{ env.TERRACOTTA_SHA }}
         run: |
           cd ../Terracotta
           cargo +nightly build --lib --release --target aarch64-apple-ios
           ls -la target/aarch64-apple-ios/release/libterracotta.a
 
       - name: Build libterracotta.a (simulator, aarch64-apple-ios-sim)
+        if: steps.cache.outputs.cache-hit != 'true'
         continue-on-error: true
+        env:
+          TERRACOTTA_VERSION: terracotta-${{ env.TERRACOTTA_SHA }}
         run: |
           cd ../Terracotta
           cargo +nightly build --lib --release --target aarch64-apple-ios-sim
           ls -la target/aarch64-apple-ios-sim/release/libterracotta.a || echo "(simulator build failed — device slice is enough for TrollStore)"
 
       - name: Stage artifact
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p libterracotta-out
           cp ../Terracotta/target/aarch64-apple-ios/release/libterracotta.a libterracotta-out/libterracotta.a
@@ -107,6 +141,17 @@ jobs:
             cp ../Terracotta/target/aarch64-apple-ios-sim/release/libterracotta.a libterracotta-out/libterracotta-sim.a
           fi
           ls -la libterracotta-out/
+
+      # ===== cache hit 时验证恢复的产物 =====
+
+      - name: Verify cached artifact
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: |
+          echo "✅ Cache hit! 跳过 Rust 编译（省约 10 分钟）。"
+          ls -la libterracotta-out/
+          file libterracotta-out/libterracotta.a
+
+      # ===== 总是上传 artifact 给 build-ipa job =====
 
       - name: Upload libterracotta.a as artifact
         uses: actions/upload-artifact@v4
