@@ -144,25 +144,30 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Normalize entitlements (xcodegen 会重写 .entitlements 文件)
+      - name: Ensure entitlements contain multicast permission
         run: |
-          # xcodegen generate 会把 .entitlements 重写成空 <dict/>，
-          # 在 TrollStore 安装时可能导致权限问题。这里用 python 写回正确内容。
-          # 新版 CraftLink 不需要 NE 权限，entitlements 几乎为空。
+          # 房主侧 Terracotta 的 MinecraftScanner 需要 join 多播组 224.0.2.60:4445
+          # 以接收 Minecraft「对局域网开放」LAN 广播。iOS 15+ 上没有
+          # com.apple.developer.networking.multicast entitlement 时
+          # setsockopt(IP_ADD_MEMBERSHIP) 会失败（EPERM），导致永远检测不到
+          # MC 端口（host-scanning 卡住）。
+          #
+          # 这里强制写回完整的 entitlements（含 multicast），确保 ldid 签名步骤
+          # 能把它嵌入二进制。TrollStore 安装时通过 CoreTrust bypass honor 该权限。
           python3 - <<'PYEOF'
           ent_content = '''<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+              <key>com.apple.developer.networking.multicast</key>
+              <true/>
           </dict>
           </plist>
           '''
-          ent_lines = [line.strip() if line.strip() else line for line in ent_content.split('\n')]
-          ent_cleaned = '\n'.join(ent_lines) + '\n'
           with open('CraftLink.entitlements', 'w') as f:
-              f.write(ent_cleaned)
+              f.write(ent_content)
           print("=== CraftLink.entitlements ===")
-          print(ent_cleaned)
+          print(ent_content)
           PYEOF
 
       - name: Build unsigned .app

@@ -5,11 +5,22 @@
     <!--
       新版 CraftLink 不再使用 NEPacketTunnelProvider / NetworkExtension。
       Terracotta Rust 库以 `no_tun=true` + `port_forward` 模式跑 EasyTier，
-      只占用本地 loopback 端口（127.0.0.1），无需任何系统级网络权限。
-      
-      因此删除了 `com.apple.developer.networking.networkextension` 权限。
+      只占用本地 loopback 端口（127.0.0.1），无需任何系统级网络扩展权限。
+      因此删除了 `com.apple.developer.networking.networkextension` 权限，
       也删除了 App Group（不再需要主 App 与 PacketTunnel 扩展共享 UserDefaults）。
     -->
-    <!-- 留空，未来如需 push 通知等可在此添加 -->
+    <!--
+      多播接收权限：房主侧 Terracotta 的 MinecraftScanner 需要 join 多播组
+      224.0.2.60:4445 以接收 Minecraft「对局域网开放」的 LAN 广播。
+      iOS 15+ 上没有此 entitlement，setsockopt(IP_ADD_MEMBERSHIP) 会失败（EPERM），
+      导致 scanning.rs 里 join_multicast_v4(...)? 传播错误、socket 被丢弃，
+      没有任何 socket 能收到多播 → 永远检测不到 MC 端口。
+
+      此 entitlement 在 App Store 分发时需向 Apple 申请（受限 entitlement）；
+      TrollStore 安装的 IPA 通过 ldid ad-hoc 签名 + CoreTrust bypass 嵌入，
+      系统会 honor 该权限。
+    -->
+    <key>com.apple.developer.networking.multicast</key>
+    <true/>
 </dict>
 </plist>
