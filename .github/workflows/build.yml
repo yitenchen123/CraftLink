@@ -1,19 +1,34 @@
 name: Build CraftLink IPA (unsigned)
 
 # 新版 CraftLink 单 target，无 PacketTunnel 扩展，无 NE 权限。
-# 只需链接 libterracotta.a（burningtnt/Terracotta 的 iOS 构建，含 lib_ios.rs 补丁）。
+# 链接 libterracotta.a（burningtnt/Terracotta 的 iOS 构建，含 lib_ios.rs 补丁）。
 #
-# 用户首次构建前需自行编译 libterracotta.a 并上传到 Release，然后修改下面的 URL。
-# 构建方法见 README.md / scripts/build_ios.sh（在 Amethyst-Terracotta-iOS 仓库里）。
+# 触发方式：
+#   - push 到 main：自动构建 IPA（会先调用 build-lib.yml 编译 libterracotta.a）
+#   - 推 v* tag：构建 IPA 并发布到 Release
+#   - workflow_dispatch：手动触发
+#
+# 修复历史问题：旧版只在 push tag 时触发，改代码后 push 不会触发构建。
+# 现在加了 branches: [main]，改代码提交即触发。
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
 
 jobs:
-  build:
+  # ---- Job 1: 编译 libterracotta.a（调用复用 workflow）----
+  build-lib:
+    name: Build libterracotta.a
+    uses: ./.github/workflows/build-lib.yml
+
+  # ---- Job 2: 编译 CraftLink IPA ----
+  build-ipa:
+    name: Build CraftLink IPA
+    needs: build-lib
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -23,20 +38,18 @@ jobs:
           brew install xcodegen
           brew install ldid
 
-      - name: Download Terracotta static library
+      - name: Download libterracotta.a (from build-lib job)
+        uses: actions/download-artifact@v4
+        with:
+          name: libterracotta
+          path: RustLib/
+
+      - name: Verify libterracotta.a
         run: |
-          mkdir -p RustLib
-          # 占位 URL — 用户构建 libterracotta.a 后上传到自己的 Release 并替换此 URL。
-          # 构建步骤见 README.md「构建 libterracotta.a」一节。
-          curl -L --fail -o RustLib/libterracotta.a \
-            "https://github.com/yitenchen123/CraftLink/releases/download/v2.0.0-lib/libterracotta.a" \
-            || {
-              echo "❌ libterracotta.a 下载失败。"
-              echo "请先按 README.md 步骤编译 libterracotta.a 并上传到 Release，"
-              echo "然后修改 .github/workflows/build.yml 中的 URL。"
-              exit 1
-            }
           ls -la RustLib/
+          file RustLib/libterracotta.a
+          # 确认是 arm64 iOS 静态库
+          lipo -info RustLib/libterracotta.a || true
 
       - name: Generate Xcode project
         run: xcodegen generate

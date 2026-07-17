@@ -110,14 +110,33 @@ xcodebuild build \
 - **SideStore / AltStore**：用免费开发者证书签名安装。
 - **越狱设备**：直接 SSH 拷贝 `.app` 到 `/Applications/`。
 
-## 自动构建（GitHub Actions）
+## 自动构建（GitHub Actions，全自动化）
 
-推 `v*` tag（如 `v2.0.0`）触发 CI 自动出未签名 IPA：
+**改代码提交即触发构建，无需手动操作。**
 
-1. 先按「编译 libterracotta.a」步骤构建一次 `libterracotta.a`
-2. 上传到自己的 GitHub Release，tag 用 `v2.0.0-lib`
-3. 修改 `.github/workflows/build.yml` 中的下载 URL
-4. 推 `v2.0.0` tag → CI 自动构建 IPA 并发布到 Release
+```
+push 到 main
+   ↓
+build-lib.yml: clone Terracotta + EasyTier → 自动打补丁 → cargo 编译 libterracotta.a
+   ↓
+build.yml: 下载 libterracotta.a → xcodegen → xcodebuild → 出 IPA
+   ↓
+artifact: CraftLink-unsigned.ipa
+```
+
+因为 Terracotta / EasyTier 上游都不支持 iOS，CI 会自动：
+1. clone `burningtnt/Terracotta` + `burningtnt/EasyTier`
+2. 运行 [`scripts/patch_terracotta_for_ios.py`](scripts/patch_terracotta_for_ios.py) 自动打补丁（幂等）
+3. `cargo +nightly build --target aarch64-apple-ios` 编译出 `libterracotta.a`
+4. 传给下游 job 编译 IPA
+
+触发方式：
+- **push 到 main**：自动构建 IPA（artifact 下载，30 天有效）
+- **推 `v*` tag**（如 `v2.0.0`）：构建 IPA 并发布到 Release
+- **手动**：Actions 页面点 "Run workflow"
+- **推 `v*-lib` tag**（如 `v2.0.0-lib`）：单独编译 `libterracotta.a` 并发布到 Release
+
+> 旧版只在 `push: tags: v*` 时触发，所以改代码提交不会构建。新版加了 `push: branches: [main]`，现在改完代码提交就会自动构建。
 
 ## 与 HMCL/FCL/ZL2 的协议兼容性
 
