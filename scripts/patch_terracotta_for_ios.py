@@ -162,6 +162,21 @@ def patch_terracotta_cargo_toml(path: Path) -> None:
         return new
     patch_file(path, transform)
 
+def patch_terracotta_build_rs(path: Path) -> None:
+    """build.rs: iOS 也跳过下载 EasyTier 可执行文件（用 linkage_impl 库链接，
+    不需要 easytier-core 二进制）。Android 已在第 184 行 return，iOS 需同样处理。"""
+    log("Patching Terracotta build.rs ...")
+    def transform(old: str) -> str:
+        if '("ios"' in old:
+            return None  # 已打补丁
+        # 第 184 行：Android 的 return 分支，扩展为包含 iOS
+        old_line = '("android", "arm") | ("android", "aarch64") | ("android", "x86") | ("android", "x86_64") => return,'
+        new_line = '("android", "arm") | ("android", "aarch64") | ("android", "x86") | ("android", "x86_64") | ("ios", "aarch64") | ("ios", "x86_64") | ("ios", "x86") => return,'
+        if old_line in old:
+            return old.replace(old_line, new_line, 1)
+        return old
+    patch_file(path, transform)
+
 def copy_lib_ios_rs(terracotta_dir: Path, script_dir: Path) -> None:
     """把 rust/src/lib_ios.rs 复制到 Terracotta/src/lib_ios.rs。"""
     # script_dir 是 scripts/，其上一级是仓库根，再进 rust/src/
@@ -236,6 +251,7 @@ def main() -> int:
     patch_terracotta_lib_rs(terracotta_dir / "src" / "lib.rs")
     patch_terracotta_easytier_mod_rs(terracotta_dir / "src" / "easytier" / "mod.rs")
     patch_terracotta_cargo_toml(terracotta_dir / "Cargo.toml")
+    patch_terracotta_build_rs(terracotta_dir / "build.rs")
     copy_lib_ios_rs(terracotta_dir, script_dir)
 
     # --- EasyTier 补丁 ---
