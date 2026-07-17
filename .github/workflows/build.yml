@@ -44,6 +44,11 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Install protobuf (EasyTier build script 需要 protoc)
+        run: |
+          brew install protobuf
+          protoc --version
+
       - name: Clone burningtnt/Terracotta
         run: |
           git clone https://github.com/burningtnt/Terracotta.git ../Terracotta
