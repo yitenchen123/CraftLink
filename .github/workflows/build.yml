@@ -21,6 +21,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      rebuild_lib:
+        description: '重新编译 libterracotta.a（改了 lib_ios.rs 或补丁脚本时勾选）'
+        type: boolean
+        default: false
 
 jobs:
   build-ipa:
@@ -34,19 +39,57 @@ jobs:
           brew install xcodegen
           brew install ldid
 
-      - name: Verify prebuilt libterracotta.a
+      # ===== 可选：重新编译 libterracotta.a（workflow_dispatch 时勾选 rebuild_lib）=====
+      # 临时：当 RustLib/libterracotta.a 不含 terracotta_ios_start_host_with_port 符号时自动重建
+      - name: Check if libterracotta.a needs rebuild
+        id: needrebuild
         run: |
-          echo "=== 检查预编译的 libterracotta.a ==="
+          if [[ -f RustLib/libterracotta.a ]] && nm RustLib/libterracotta.a 2>/dev/null | grep -q terracotta_ios_start_host_with_port; then
+            echo "need=false" >> $GITHUB_OUTPUT
+            echo "✅ libterracotta.a 已含 start_host_with_port 符号，无需重建"
+          else
+            echo "need=true" >> $GITHUB_OUTPUT
+            echo "⚠️ libterracotta.a 缺少 start_host_with_port 符号，需要重建"
+          fi
+
+      - name: Install Rust nightly + iOS targets
+        if: steps.needrebuild.outputs.need == 'true' || github.event.inputs.rebuild_lib == 'true'
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup component add rust-src --toolchain nightly
+          rustup target add aarch64-apple-ios --toolchain nightly
+          rustup default nightly
+          brew install protobuf
+
+      - name: Clone Terracotta + EasyTier and rebuild libterracotta.a
+        if: steps.needrebuild.outputs.need == 'true' || github.event.inputs.rebuild_lib == 'true'
+        run: |
+          git clone --depth=1 https://github.com/burningtnt/Terracotta.git ../Terracotta
+          git clone --depth=1 -b main https://github.com/burningtnt/EasyTier.git ../EasyTier
+          echo "TERRACOTTA_SHA=$(cd ../Terracotta && git rev-parse HEAD)" >> $GITHUB_ENV
+          python3 scripts/patch_terracotta_for_ios.py ../Terracotta ../EasyTier
+          cat >> ../Terracotta/Cargo.toml <<'CARGOEOF'
+
+          [patch."https://github.com/burningtnt/EasyTier.git"]
+          easytier = { path = "../EasyTier/easytier" }
+          CARGOEOF
+          cd ../Terracotta
+          TERRACOTTA_VERSION=terracotta-${TERRACOTTA_SHA} cargo +nightly build --lib --release --target aarch64-apple-ios
+          cp target/aarch64-apple-ios/release/libterracotta.a $GITHUB_WORKSPACE/RustLib/libterracotta.a
+          echo "✅ libterracotta.a 重新编译完成"
+          ls -la $GITHUB_WORKSPACE/RustLib/libterracotta.a
+
+      - name: Verify libterracotta.a
+        run: |
+          echo "=== 检查 libterracotta.a ==="
           if [[ ! -f RustLib/libterracotta.a ]]; then
             echo "❌ RustLib/libterracotta.a 不存在！"
-            echo "请手动触发 'Rebuild libterracotta.a' workflow 重新编译，"
-            echo "下载 artifact 后将 libterracotta.a 放入 RustLib/ 并提交。"
+            echo "请在 GitHub Actions 页面手动触发 build workflow 并勾选 rebuild_lib。"
             exit 1
           fi
           ls -la RustLib/libterracotta.a
           file RustLib/libterracotta.a
           lipo -info RustLib/libterracotta.a || true
-          echo "✅ 预编译 libterracotta.a 存在，跳过 Rust 编译。"
 
       - name: Generate Xcode project
         run: xcodegen generate
