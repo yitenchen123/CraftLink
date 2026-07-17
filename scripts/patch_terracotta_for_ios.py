@@ -88,6 +88,18 @@ def patch_terracotta_lib_rs(path: Path) -> None:
             1,
         )
 
+        # 1b. v0.4.2+ 改用 compile_error 守卫（而非 crate 级 cfg）。
+        #     #[cfg(not(target_os = "android"))]
+        #     compile_error!("Terracotta Library is intended for Android platform.");
+        #     需要把 not(android) 扩展为 not(any(android, ios))，否则 iOS 编译直接报错。
+        old_guard = '#[cfg(not(target_os = "android"))]\ncompile_error!("Terracotta Library is intended for Android platform.");'
+        new_guard = '#[cfg(not(any(target_os = "android", target_os = "ios")))]\ncompile_error!("Terracotta Library is intended for Android/iOS platform.");'
+        if old_guard in new:
+            new = new.replace(old_guard, new_guard, 1)
+        elif 'compile_error!("Terracotta Library is intended for Android' in new:
+            # 幂等：已扩展为 ios，跳过
+            pass
+
         # 2. 给 try_jvm! 宏加 cfg(android) — 它只在 jni_* 函数中使用
         new = gate(new, 'macro_rules! try_jvm {')
 
