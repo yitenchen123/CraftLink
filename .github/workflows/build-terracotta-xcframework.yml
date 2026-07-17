@@ -82,9 +82,10 @@ jobs:
 
       - name: Build aarch64-apple-ios-sim (simulator arm64)
         env:
-          # bindgen/clang 需要指向 iphonesimulator SDK，否则报
-          # "version 'sim' in target triple 'arm64-apple-ios-sim' is invalid"
-          SDKROOT: iphonesimulator
+          # kcp-sys 的 bindgen 用 arm64-apple-ios-sim 作 triple 传给 clang，但 clang
+          # 只认 arm64-apple-ios-simulator。用 BINDGEN_EXTRA_CLANG_ARGS 覆盖 target
+          # 并指定 iphonesimulator SDK 的 sysroot，让 clang 找到 stdlib.h。
+          BINDGEN_EXTRA_CLANG_ARGS: "--target=arm64-apple-ios-simulator -isysroot $(xcrun --sdk iphonesimulator --show-sdk-path)"
         run: |
           cd /tmp/Terracotta
           TERRACOTTA_VERSION=terracotta-${TERRACOTTA_SHA} cargo +nightly build --lib --release --target aarch64-apple-ios-sim
@@ -92,7 +93,7 @@ jobs:
 
       - name: Build x86_64-apple-ios (simulator intel)
         env:
-          SDKROOT: iphonesimulator
+          BINDGEN_EXTRA_CLANG_ARGS: "--target=x86_64-apple-ios-simulator -isysroot $(xcrun --sdk iphonesimulator --show-sdk-path)"
         run: |
           cd /tmp/Terracotta
           TERRACOTTA_VERSION=terracotta-${TERRACOTTA_SHA} cargo +nightly build --lib --release --target x86_64-apple-ios
