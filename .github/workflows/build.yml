@@ -78,13 +78,13 @@ jobs:
           echo "=== Cargo.toml 末尾 ==="
           tail -5 ../Terracotta/Cargo.toml
 
-      - name: Build libterracotta.a (device: aarch64-apple-ios)
+      - name: Build libterracotta.a (device, aarch64-apple-ios)
         run: |
           cd ../Terracotta
           cargo +nightly build --lib --release --target aarch64-apple-ios
           ls -la target/aarch64-apple-ios/release/libterracotta.a
 
-      - name: Build libterracotta.a (simulator: aarch64-apple-ios-sim)
+      - name: Build libterracotta.a (simulator, aarch64-apple-ios-sim)
         continue-on-error: true
         run: |
           cd ../Terracotta
