@@ -85,7 +85,6 @@ jobs:
           # bindgen/clang 需要指向 iphonesimulator SDK，否则报
           # "version 'sim' in target triple 'arm64-apple-ios-sim' is invalid"
           SDKROOT: iphonesimulator
-          CARGO_TARGET_AARCH64_APPLE_IOS_SIM_RUSTFLAGS: -L $(xcrun --sdk iphonesimulator --show-sdk-path)/usr/lib
         run: |
           cd /tmp/Terracotta
           TERRACOTTA_VERSION=terracotta-${TERRACOTTA_SHA} cargo +nightly build --lib --release --target aarch64-apple-ios-sim
@@ -94,7 +93,6 @@ jobs:
       - name: Build x86_64-apple-ios (simulator intel)
         env:
           SDKROOT: iphonesimulator
-          CARGO_TARGET_X86_64_APPLE_IOS_RUSTFLAGS: -L $(xcrun --sdk iphonesimulator --show-sdk-path)/usr/lib
         run: |
           cd /tmp/Terracotta
           TERRACOTTA_VERSION=terracotta-${TERRACOTTA_SHA} cargo +nightly build --lib --release --target x86_64-apple-ios
