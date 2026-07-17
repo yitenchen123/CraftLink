@@ -14,6 +14,8 @@ struct CreateRoomView: View {
     @State private var isCopied = false
     @State private var isCreating = false
     @State private var showError = false
+    /// 端口输入校验错误（本地，不写 TerracottaManager.lastError）。
+    @State private var portInputError: String?
 
     /// 模式开关：true=手动输入端口（推荐，iOS 多播不可靠），false=自动扫描多播。
     @State private var useManualPort = true
@@ -66,7 +68,13 @@ struct CreateRoomView: View {
                                 .keyboardType(.numberPad)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .frame(width: 120)
+                                .onChange(of: port) { _ in portInputError = nil }
                             Spacer()
+                        }
+                        if let err = portInputError {
+                            Text(err)
+                                .font(.caption)
+                                .foregroundColor(.red)
                         }
                     }
                     .padding(.horizontal)
@@ -273,8 +281,7 @@ struct CreateRoomView: View {
             // 手动端口模式：直接用用户输入的端口启动 host，绕过多播扫描。
             guard let portNum = UInt16(port), portNum > 0 else {
                 isCreating = false
-                terracottaManager.lastError = "端口号无效，请输入 MC 显示的端口号（如 25565）"
-                showError = true
+                portInputError = "端口号无效，请输入 MC 显示的端口号（如 25565）"
                 return
             }
             terracottaManager.createRoomWithPort(inviteCode: nil, port: portNum, playerName: nil) { error in
