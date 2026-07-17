@@ -31,20 +31,18 @@ use std::ffi::{CStr, CString};
 use std::os::fd::FromRawFd;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::thread;
-use std::time::Duration;
 
 use crate::controller::{self, Room, RoomKind};
 use crate::easytier::EasyTierTunRequest;
-use crate::once_cell::OnceCell;
+// 使用 crate 根的 MACHINE_ID_FILE / LOGGING_FD（与 controller 模块共享同一个 static），
+// 而不是在此重新定义。否则 terracotta_ios_start 设置的是 lib_ios 的副本，
+// controller::rooms::scaffolding 读的是 crate::MACHINE_ID_FILE，两者不一致。
+use crate::{LOGGING_FD, MACHINE_ID_FILE};
 
 // ---------------------------------------------------------------------------
 // Global state (mirrors the Android side of src/lib.rs)
 // ---------------------------------------------------------------------------
-
-static MACHINE_ID_FILE: OnceCell<PathBuf> = OnceCell::new();
-static LOGGING_FD: Mutex<Option<std::fs::File>> = Mutex::new(None);
 
 /// iOS does NOT use a system VPN / NEPacketTunnelProvider.
 /// EasyTier is launched with `no_tun = true` and only uses `port_forward` to

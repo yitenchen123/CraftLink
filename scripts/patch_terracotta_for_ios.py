@@ -47,31 +47,102 @@ def patch_file(path: Path, transform) -> bool:
 # ---------------------------------------------------------------------------
 
 def patch_terracotta_lib_rs(path: Path) -> None:
-    """src/lib.rs: 把顶部 cfg(android) 改为 any(android, ios)，并把 Android
-    专用项（jni 相关）用 #[cfg(target_os = "android")] 包起来。
-    由于 lib.rs 里 Android 专用项很多，这里采用最小侵入策略：
-    仅修改顶部 cfg，并把 on_vpnservice_change 的 Android 版本用 cfg 限制
-    （iOS 版由 lib_ios.rs 重新定义为 no-op）。"""
+    """src/lib.rs: 把顶部 cfg(android) 改为 any(android, ios)，并把所有 JNI
+    相关代码（use jni::*、try_jvm! 宏、JNI_OnLoad、jni_* 函数、logging_android、
+    on_vpnservice_change、parse_jstring、VPN_SERVICE_CFG）用 #[cfg(target_os = "android")]
+    包起来，使它们只在 Android 上编译。
+
+    共享项（logging! 宏、ADDRESSES、MACHINE_ID_FILE、LOGGING_FD、模块声明）保留
+    在 Android + iOS 上都编译。controller 模块通过 crate::MACHINE_ID_FILE 引用
+    机器 ID 文件路径，因此 MACHINE_ID_FILE 必须在 iOS 上也存在。
+
+    logging! 宏展开为 crate::logging_android(...)，被 mc/scaffolding/controller 等
+    共享模块调用。因此 iOS 上必须也存在 logging_android（由本补丁添加一个 iOS 版本，
+    写文件 + eprintln）。
+
+    on_vpnservice_change 在 Android 上用 VPN_SERVICE_CFG，在 iOS 上由 lib_ios.rs
+    定义为 no-op，通过 pub(crate) use lib_ios::on_vpnservice_change 重导出到 crate 根。
+    """
     log("Patching Terracotta src/lib.rs ...")
+    CFG_A = '#[cfg(target_os = "android")]'
+
+    def gate(text: str, needle: str) -> str:
+        """在 needle 前插入 CFG_A（如果还没有）。needle 必须在 text 中唯一。"""
+        prefixed = CFG_A + '\n' + needle
+        if prefixed in text:
+            return text  # 已添加
+        if needle not in text:
+            return text  # 找不到，跳过
+        return text.replace(needle, prefixed, 1)
+
     def transform(old: str) -> str:
+        # 幂等检测：已有 jni 导入的 cfg 门控 + lib_ios 模块
+        if 'mod lib_ios;' in old and (CFG_A + '\nuse jni::') in old:
+            return None  # 已打补丁
         new = old
+
         # 1. 顶部 crate 级 cfg
         new = new.replace(
             '#![cfg(target_os = "android")]',
             '#![cfg(any(target_os = "android", target_os = "ios"))]',
             1,
         )
-        # 2. on_vpnservice_change: Android 版必须排除 iOS，否则与 lib_ios.rs 重复定义
-        #    给 pub(crate) fn on_vpnservice_change 加上 #[cfg(target_os = "android")]
-        if 'pub(crate) fn on_vpnservice_change' in new and '#[cfg(target_os = "android")]\npub(crate) fn on_vpnservice_change' not in new:
-            new = new.replace(
-                'pub(crate) fn on_vpnservice_change',
-                '#[cfg(target_os = "android")]\npub(crate) fn on_vpnservice_change',
-                1,
-            )
-        # 3. 追加 lib_ios 模块声明（如果还没有）
+
+        # 2. 给 try_jvm! 宏加 cfg(android) — 它只在 jni_* 函数中使用
+        new = gate(new, 'macro_rules! try_jvm {')
+
+        # 3. 给 jni 导入加 cfg(android) — jni crate 只在 Android 上是依赖
+        new = gate(new, 'use jni::signature::{Primitive, ReturnType};')
+        new = gate(new, 'use jni::sys::JNI_VERSION_1_6;')
+        new = gate(new, 'use jni::{objects::{JClass, JString}, sys::{jboolean, jint, jlong, jshort, jsize, jvalue, JNI_FALSE, JNI_TRUE}, JNIEnv, JavaVM, NativeMethod};')
+
+        # 4. 给 VPN_SERVICE_CFG 加 cfg(android) — 只在 Android JNI 线程中使用
+        new = gate(new, 'static VPN_SERVICE_CFG: Mutex<Option<crate::easytier::EasyTierTunRequest>> = Mutex::new(None);')
+
+        # 5. 给 JNI_GetCreatedJavaVMs / JNI_OnLoad 加 cfg(android)
+        #    这两个有 #[unsafe(no_mangle)] 在前面，需要加在 #[unsafe(no_mangle)] 之前
+        new = gate(new, '#[unsafe(no_mangle)]\n#[allow(non_snake_case)]\nextern "system" fn JNI_GetCreatedJavaVMs')
+        new = gate(new, '#[unsafe(no_mangle)]\n#[allow(non_snake_case)]\nextern "system" fn JNI_OnLoad')
+
+        # 6. 给所有 jni_* 函数加 cfg(android)
+        for fn_name in [
+            'jni_start', 'jni_get_state', 'jni_set_waiting', 'jni_set_scanning',
+            'jni_set_guesting', 'jni_verify_room_code', 'jni_get_metadata',
+            'jni_prepare_export_logs', 'jni_finish_export_logs', 'jni_panic',
+        ]:
+            new = gate(new, 'extern "system" fn ' + fn_name)
+
+        # 7. 给 logging_android 加 cfg(android) — Android 版用 __android_log_write
+        new = gate(new, 'fn logging_android(line: String) {')
+
+        # 8. 给 on_vpnservice_change 加 cfg(android) — iOS 版由 lib_ios.rs 提供
+        new = gate(new, 'pub(crate) fn on_vpnservice_change(request: crate::easytier::EasyTierTunRequest) {')
+
+        # 9. 给 parse_jstring 加 cfg(android) — 只在 jni_* 函数中使用
+        new = gate(new, 'fn parse_jstring')
+
+        # 10. 追加 iOS 支持：iOS 版 logging_android + lib_ios 模块 + on_vpnservice_change 重导出
         if 'mod lib_ios;' not in new:
-            new = new.rstrip() + '\n\n#[cfg(target_os = "ios")]\nmod lib_ios;\n'
+            ios_block = (
+                '\n'
+                '// --- iOS support (auto-patched by patch_terracotta_for_ios.py) ---\n'
+                '#[cfg(target_os = "ios")]\n'
+                'fn logging_android(line: String) {\n'
+                '    if let Ok(mut fd) = LOGGING_FD.lock() && let Some(fd) = fd.as_mut() {\n'
+                '        let _ = fd.write_all(line.as_bytes());\n'
+                '        let _ = fd.write_all(b"\\n");\n'
+                '    }\n'
+                '    eprintln!("[Terracotta] {}", line);\n'
+                '}\n'
+                '\n'
+                '#[cfg(target_os = "ios")]\n'
+                'mod lib_ios;\n'
+                '\n'
+                '#[cfg(target_os = "ios")]\n'
+                'pub(crate) use lib_ios::on_vpnservice_change;\n'
+            )
+            new = new.rstrip() + '\n' + ios_block
+
         return new
     patch_file(path, transform)
 
